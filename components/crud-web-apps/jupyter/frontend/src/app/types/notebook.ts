@@ -24,6 +24,7 @@ export interface NotebookResponseObject {
 }
 
 export interface NotebookProcessedObject extends NotebookResponseObject {
+  copyAction?: string;
   deleteAction?: string;
   connectAction?: string;
   startStopAction?: string;

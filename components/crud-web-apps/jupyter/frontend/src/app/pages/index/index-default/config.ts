@@ -125,6 +125,13 @@ export const defaultConfig: TableConfig = {
       matColumnDef: 'actions',
       value: new ActionListValue([
         new ActionButtonValue({
+          name: 'copy',
+          tooltip: $localize`copy to this notebook server`,
+          color: 'primary',
+          field: 'copyAction',
+          text: $localize`COPY`,
+        }),
+        new ActionButtonValue({
           name: 'connect',
           tooltip: $localize`Connect to this notebook server`,
           color: 'primary',

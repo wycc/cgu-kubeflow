@@ -97,6 +97,9 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   // Event handling functions
   reactToAction(a: ActionEvent) {
     switch (a.action) {
+      case 'copy':
+        alert("Test");
+        break;
       case 'delete':
         this.deleteVolumeClicked(a.data);
         break;
@@ -217,6 +220,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
 
   // Data processing functions
   updateNotebookFields(notebook: NotebookProcessedObject) {
+    notebook.copyAction = this.processCopyActionStatus(notebook);
     notebook.deleteAction = this.processDeletionActionStatus(notebook);
     notebook.connectAction = this.processConnectActionStatus(notebook);
     notebook.startStopAction = this.processStartStopActionStatus(notebook);
@@ -234,6 +238,14 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   }
 
   // Action handling functions
+  processCopyActionStatus(notebook: NotebookProcessedObject) {
+    if (notebook.status.phase !== STATUS_TYPE.TERMINATING) {
+      return STATUS_TYPE.READY;
+    }
+
+    return STATUS_TYPE.TERMINATING;
+  }
+  
   processDeletionActionStatus(notebook: NotebookProcessedObject) {
     if (notebook.status.phase !== STATUS_TYPE.TERMINATING) {
       return STATUS_TYPE.READY;

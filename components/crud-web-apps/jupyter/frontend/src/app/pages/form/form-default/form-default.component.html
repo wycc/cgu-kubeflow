@@ -7,7 +7,46 @@
   </lib-title-actions-toolbar>
 
   <!--scrollable page content-->
-  <div class="page-padding lib-flex-grow lib-overflow-auto">
+  <div *ngIf="isBasic" class="page-padding lib-flex-grow lib-overflow-auto">
+
+    <app-form-name-namespace
+    [parentForm]="formCtrl"
+    ></app-form-name-namespace>
+
+    <mat-grid-list cols="3">
+      <mat-grid-tile style="background: red">
+        Tile 1
+      </mat-grid-tile>
+      <mat-grid-tile style="background: green">
+        Tile 2
+      </mat-grid-tile>
+      <mat-grid-tile style="background: blue">
+        Tile 3
+      </mat-grid-tile>
+      <mat-grid-tile style="background: yellow">
+        Tile 4
+      </mat-grid-tile>
+    </mat-grid-list>
+
+    <div class="form-buttons">
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="onSubmit()"
+        [disabled]="!formCtrl.valid || blockSubmit"
+        i18n
+      >
+        LAUNCH
+      </button>
+
+      <button mat-raised-button type="button" (click)="onAdvanced()" i18n>
+        ADVANCED
+      </button>
+    </div>
+
+  </div>
+
+  <div *ngIf="!isBasic" class="page-padding lib-flex-grow lib-overflow-auto">
     <form
       novalidate
       class="form"

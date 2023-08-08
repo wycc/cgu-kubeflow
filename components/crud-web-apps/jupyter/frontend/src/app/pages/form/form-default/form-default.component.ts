@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { Config, NotebookFormObject } from 'src/app/types';
 import { Subscription } from 'rxjs';
+import { Subject } from 'rxjs';
 import {
   NamespaceService,
   BackendService,
@@ -20,6 +21,9 @@ import { environment } from '@app/environment';
   styleUrls: ['./form-default.component.scss'],
 })
 export class FormDefaultComponent implements OnInit, OnDestroy {
+  public isBasic = true;
+  public applying$ = new Subject <boolean>();
+
   currNamespace = '';
   formCtrl: FormGroup;
   config: Config;
@@ -170,4 +174,10 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
   onCancel() {
     this.router.navigate(['/']);
   }
+
+  onAdvanced() {
+    this.isBasic = false;
+    this.applying$.next(true);
+  }
+
 }

@@ -6,6 +6,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { MatGridListModule } from '@angular/material/grid-list'; 
 
 import { FormDefaultComponent } from './form-default.component';
 import { FormNameComponent } from './form-name/form-name.component';
@@ -47,6 +48,7 @@ import { VolumeModule } from './volume/volume.module';
     MatButtonToggleModule,
     TitleActionsToolbarModule,
     VolumeModule,
+    MatGridListModule,
   ],
   exports: [
     FormDefaultComponent,
