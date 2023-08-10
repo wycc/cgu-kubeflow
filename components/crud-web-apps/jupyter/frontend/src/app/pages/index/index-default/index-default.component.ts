@@ -15,6 +15,7 @@ import {
 import { JWABackendService } from 'src/app/services/backend.service';
 import { Subscription } from 'rxjs';
 import {
+  defaultAdvancedConfig,
   defaultConfig,
   getDeleteDialogConfig,
   getStopDialogConfig,
@@ -33,9 +34,15 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   poller: ExponentialBackoff;
 
   currNamespace = '';
+  isBasic = false;
+  configAdvance = defaultAdvancedConfig;
+  config = defaultConfig;
   subs = new Subscription();
 
-  config = defaultConfig;
+  //if (isBasicSetting) {
+  //  this.config = defaultConfig;
+  //} 
+      
   rawData: NotebookResponseObject[] = [];
   processedData: NotebookProcessedObject[] = [];
 
@@ -245,7 +252,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
 
     return STATUS_TYPE.TERMINATING;
   }
-  
+
   processDeletionActionStatus(notebook: NotebookProcessedObject) {
     if (notebook.status.phase !== STATUS_TYPE.TERMINATING) {
       return STATUS_TYPE.READY;
