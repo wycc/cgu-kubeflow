@@ -14,14 +14,14 @@
 
     <mat-grid-list cols="6" rowHeight="300px">
       <ng-container *ngFor="let notebook of processedData">
-        <mat-grid-tile >
+        <mat-grid-tile *ngIf="notebook.isTemplate==='yes'" >
           <mat-card class="post-tile"> 
             <mat-card-header>
               <mat-card-title>{{ notebook.name }}</mat-card-title>
               <mat-card-subtitle>{{ notebook.age }}</mat-card-subtitle>
               <img mat-card-avatar src="https://picsum.photos/300/300/?random" />
             </mat-card-header>
-            <mat-card-content>{{ notebook.image }}</mat-card-content> 
+            <mat-card-content>{{ notebook.isTemplate }}</mat-card-content> 
             <mat-card-actions> 
               <button mat-button color="paimray">test</button> 
               <button mat-button color="accent">test2</button> 

@@ -126,6 +126,13 @@ def notebook_dict_from_k8s_obj(notebook):
         annotations = notebook["metadata"]["annotations"]
         server_type = annotations.get("notebooks.kubeflow.org/server-type")
 
+    isTemplate = None
+    if notebook["metadata"].get("labels"):
+        labels = notebook["metadata"]["labels"]
+        isTemplate = labels.get("isTemplateName")
+
+    log.info("Got isTemplate: %s" % isTemplate)
+
     return {
         "name": notebook["metadata"]["name"],
         "namespace": notebook["metadata"]["namespace"],
@@ -139,4 +146,5 @@ def notebook_dict_from_k8s_obj(notebook):
         "memory": cntr["resources"]["requests"]["memory"],
         "volumes": [v["name"] for v in cntr["volumeMounts"]],
         "status": status.process_status(notebook),
+        "isTemplate": isTemplate,
     }

@@ -21,6 +21,7 @@ export interface NotebookResponseObject {
   };
   environment: string;
   shortImage: string;
+  isTemplate: string;
 }
 
 export interface NotebookProcessedObject extends NotebookResponseObject {
