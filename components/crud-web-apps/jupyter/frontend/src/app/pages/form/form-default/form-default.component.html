@@ -8,24 +8,28 @@
 
   <!--scrollable page content-->
   <div *ngIf="isBasic" class="page-padding lib-flex-grow lib-overflow-auto">
-
     <app-form-name-namespace
     [parentForm]="formCtrl"
     ></app-form-name-namespace>
 
-    <mat-grid-list cols="3">
-      <mat-grid-tile style="background: red">
-        Tile 1
-      </mat-grid-tile>
-      <mat-grid-tile style="background: green">
-        Tile 2
-      </mat-grid-tile>
-      <mat-grid-tile style="background: blue">
-        Tile 3
-      </mat-grid-tile>
-      <mat-grid-tile style="background: yellow">
-        Tile 4
-      </mat-grid-tile>
+    <mat-grid-list cols="6" rowHeight="300px">
+      <ng-container *ngFor="let notebook of processedData">
+        <mat-grid-tile >
+          <mat-card class="post-tile"> 
+            <mat-card-header>
+              <mat-card-title>{{ notebook.name }}</mat-card-title>
+              <mat-card-subtitle>{{ notebook.age }}</mat-card-subtitle>
+              <img mat-card-avatar src="https://picsum.photos/300/300/?random" />
+            </mat-card-header>
+            <mat-card-content>{{ notebook.image }}</mat-card-content> 
+            <mat-card-actions> 
+              <button mat-button color="paimray">test</button> 
+              <button mat-button color="accent">test2</button> 
+            </mat-card-actions> 
+            <mat-card-footer>{{ notebook.shortImage }}</mat-card-footer> 
+          </mat-card>          
+        </mat-grid-tile>
+      </ng-container>
     </mat-grid-list>
 
     <div class="form-buttons">

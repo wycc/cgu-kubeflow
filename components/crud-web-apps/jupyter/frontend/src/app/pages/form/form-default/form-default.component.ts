@@ -15,6 +15,18 @@ import { getFormDefaults, initFormControls } from './utils';
 import { JWABackendService } from 'src/app/services/backend.service';
 import { environment } from '@app/environment';
 
+// Lance - begin - 20230817
+import { isEqual } from 'lodash';
+import { NotebookResponseObject, NotebookProcessedObject } from 'src/app/types';
+// Lance - end - 20230817
+
+import {
+  defaultAdvancedConfig,
+  defaultConfig,
+  getDeleteDialogConfig,
+  getStopDialogConfig,
+} from '../../index/index-default/config';
+
 @Component({
   selector: 'app-form-default',
   templateUrl: './form-default.component.html',
@@ -23,6 +35,8 @@ import { environment } from '@app/environment';
 export class FormDefaultComponent implements OnInit, OnDestroy {
   public isBasic = true;
   public applying$ = new Subject <boolean>();
+
+  configAdvance = defaultAdvancedConfig;
 
   currNamespace = '';
   formCtrl: FormGroup;
@@ -36,6 +50,11 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
   existingNotebooks = new Set<string>();
 
   subscriptions = new Subscription();
+
+  // Lance - begin - 20230817
+  rawData: NotebookResponseObject[] = [];
+  processedData: NotebookProcessedObject[] = [];
+  // Lance - end - 20230817
 
   constructor(
     public namespaceService: NamespaceService,
@@ -64,6 +83,20 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
       this.namespaceService.getSelectedNamespace().subscribe(namespace => {
         this.currNamespace = namespace;
         this.formCtrl.controls.namespace.setValue(this.currNamespace);
+
+        // Lance - begin - 20230817
+        if (this.currNamespace) {
+          this.backend.getNotebooks(this.currNamespace).subscribe(notebooks => {
+            if (!isEqual(this.rawData, notebooks)) {
+              this.rawData = notebooks;
+
+              // Update the frontend's state
+              this.processedData = this.processIncomingData(notebooks);
+              // this.poller.reset();
+            }
+          });
+        }
+        // Lance - end - 20230817
       }),
     );
 
@@ -86,6 +119,19 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
     // Unsubscriptions
     this.subscriptions.unsubscribe();
   }
+
+  // Lance - begin - 20230817
+  processIncomingData(notebooks: NotebookResponseObject[]) {
+    const notebooksCopy = JSON.parse(
+      JSON.stringify(notebooks),
+    ) as NotebookProcessedObject[];
+
+    for (const nb of notebooksCopy) {
+      // this.updateNotebookFields(nb);
+    }
+    return notebooksCopy;
+  }
+  // Lance - end - 20230817
 
   // Functions for handling the Form Group of the entire Form
   getFormDefaults() {
@@ -152,6 +198,8 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
         vol.size = vol.size + 'Gi';
       }
     }
+
+    notebook.isTemplate = 'true';
 
     return notebook;
   }

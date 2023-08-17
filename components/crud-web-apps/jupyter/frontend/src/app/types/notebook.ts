@@ -52,4 +52,5 @@ export interface NotebookFormObject {
   datavols: any[];
   shm: boolean;
   configurations: PodDefault[];
+  isTemplate: string;
 }

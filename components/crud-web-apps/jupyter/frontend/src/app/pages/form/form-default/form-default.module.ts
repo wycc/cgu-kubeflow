@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatGridListModule } from '@angular/material/grid-list'; 
+import { MatCardModule } from '@angular/material/card';
 
 import { FormDefaultComponent } from './form-default.component';
 import { FormNameComponent } from './form-name/form-name.component';
@@ -14,6 +15,10 @@ import { FormImageComponent } from './form-image/form-image.component';
 import { FormCpuRamComponent } from './form-cpu-ram/form-cpu-ram.component';
 import { FormGpusComponent } from './form-gpus/form-gpus.component';
 import { FormAdvancedOptionsComponent } from './form-advanced-options/form-advanced-options.component';
+
+// Lance - begin - 20230817
+import { KubeflowModule } from 'kubeflow';
+// Lance - end - 20230817
 
 import {
   FormModule as KfFormModule,
@@ -49,6 +54,10 @@ import { VolumeModule } from './volume/volume.module';
     TitleActionsToolbarModule,
     VolumeModule,
     MatGridListModule,
+    MatCardModule,
+    // Lance - begin - 20230817
+    KubeflowModule,
+    // Lance - end - 20230817
   ],
   exports: [
     FormDefaultComponent,
