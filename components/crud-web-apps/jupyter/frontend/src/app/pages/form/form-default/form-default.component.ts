@@ -199,7 +199,7 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
       }
     }
 
-    notebook.isTemplate = 'true';
+    notebook.isTemplate = 'yes';
 
     return notebook;
   }

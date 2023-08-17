@@ -19,6 +19,7 @@ def post_pvc(namespace):
         utils.NOTEBOOK_TEMPLATE_YAML,
         name=body["name"],
         namespace=namespace,
+        isTemplate =  '\"'+body["isTemplate"]+'\"',
         serviceAccount="default-editor",
     )
 
@@ -34,7 +35,7 @@ def post_pvc(namespace):
     form.set_notebook_affinity(notebook, body, defaults)
     form.set_notebook_configurations(notebook, body, defaults)
     form.set_notebook_shm(notebook, body, defaults)
-
+    log.info("Creating Notebook: %s", notebook)
     # Notebook volumes
     api_volumes = []
     api_volumes.extend(form.get_form_value(body, defaults, "datavols",
@@ -44,6 +45,7 @@ def post_pvc(namespace):
     if workspace:
         api_volumes.append(workspace)
 
+    log.info("Creating Notebook: %s", notebook)
     # ensure that all objects can be created
     api.create_notebook(notebook, namespace, dry_run=True)
     for api_volume in api_volumes:
