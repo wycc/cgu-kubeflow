@@ -125,11 +125,18 @@ export const defaultAdvancedConfig: TableConfig = {
       matColumnDef: 'actions',
       value: new ActionListValue([
         new ActionButtonValue({
-          name: 'copy',
+          name: 'template',
+          tooltip: $localize`set to this notebook as template`,
+          color: 'primary',
+          field: 'setTemplateAction',
+          text: $localize`SET`,
+        }),
+        new ActionButtonValue({
+          name: 'remove-template',
           tooltip: $localize`copy to this notebook server`,
           color: 'primary',
-          field: 'copyAction',
-          text: $localize`COPY`,
+          field: 'removeTemplateAction',
+          text: $localize`REMOVE`,
         }),
         new ActionButtonValue({
           name: 'connect',

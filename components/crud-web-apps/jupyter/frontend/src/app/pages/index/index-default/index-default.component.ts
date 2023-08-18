@@ -104,9 +104,12 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   // Event handling functions
   reactToAction(a: ActionEvent) {
     switch (a.action) {
-      case 'copy':
-        this.copyClicked(a.data);
+      case 'template':
+        this.templateClicked(a.data);
         break;
+      case 'remove-template':
+          this.templateClicked(a.data);
+          break;        
       case 'delete':
         this.deleteVolumeClicked(a.data);
         break;
@@ -119,7 +122,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     }
   }
 
-  public copyClicked(notebook: NotebookProcessedObject) {
+  public templateClicked(notebook: NotebookProcessedObject) {
     if (notebook.isTemplate === 'yes') {
       this.disableTemplateNotebook(notebook);
     } else {
@@ -129,16 +132,16 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
 
   public enableTemplateNotebook(notebook: NotebookProcessedObject) {
     this.snackBar.open(
-      $localize`Starting Notebook server '${notebook.name}'...`,
+      $localize`Set Notebook as template '${notebook.name}'...`,
       SnackType.Info,
       3000,
     );
 
     notebook.status.phase = STATUS_TYPE.WAITING;
-    notebook.status.message = 'Starting the Notebook Server...';
+    notebook.status.message = 'Set Notebook as template...';
     this.updateNotebookFields(notebook);
 
-    this.backend.startNotebook(notebook).subscribe(() => {
+    this.backend.enableTemplateNotebook(notebook).subscribe(() => {
       this.poller.reset();
     });
   }
@@ -152,7 +155,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       }
 
       // Close the open dialog only if the request succeeded
-      this.backend.stopNotebook(notebook).subscribe({
+      this.backend.disableTemplateNotebook(notebook).subscribe({
         next: _ => {
           this.poller.reset();
           ref.close(DIALOG_RESP.ACCEPT);
@@ -172,13 +175,13 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         }
 
         this.snackBar.open(
-          $localize`Stopping Notebook server '${notebook.name}'...`,
+          $localize`Disable Notebook as template '${notebook.name}'...`,
           SnackType.Info,
           3000,
         );
 
         notebook.status.phase = STATUS_TYPE.TERMINATING;
-        notebook.status.message = 'Preparing to stop the Notebook Server...';
+        notebook.status.message = 'Preparing to disable the Notebook as template...';
         this.updateNotebookFields(notebook);
       });
     });
@@ -292,7 +295,8 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
 
   // Data processing functions
   updateNotebookFields(notebook: NotebookProcessedObject) {
-    notebook.copyAction = this.processCopyActionStatus(notebook);
+    notebook.setTemplateAction = this.processSetTemplateActionStatus(notebook);
+    notebook.removeTemplateAction = this.processRemoveTemplateActionStatus(notebook);
     notebook.deleteAction = this.processDeletionActionStatus(notebook);
     notebook.connectAction = this.processConnectActionStatus(notebook);
     notebook.startStopAction = this.processStartStopActionStatus(notebook);
@@ -310,9 +314,23 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   }
 
   // Action handling functions
-  processCopyActionStatus(notebook: NotebookProcessedObject) {
+  processSetTemplateActionStatus(notebook: NotebookProcessedObject) {
 
     if (notebook.isTemplate !== 'yes') {
+      return STATUS_TYPE.READY;
+    }
+
+    // Lance
+    // if (notebook.status.phase !== STATUS_TYPE.TERMINATING) {
+    //    return STATUS_TYPE.READY;
+    //  }
+
+    return STATUS_TYPE.TERMINATING;
+  }
+
+  processRemoveTemplateActionStatus(notebook: NotebookProcessedObject) {
+
+    if (notebook.isTemplate === 'yes') {
       return STATUS_TYPE.READY;
     }
 

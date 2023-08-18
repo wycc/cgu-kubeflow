@@ -77,6 +77,36 @@ export class JWABackendService extends BackendService {
     );
   }
 
+  // PATCH
+  // Lance - Begin - 20230818
+  public enableTemplateNotebook(notebook: NotebookProcessedObject): Observable<string> {
+    const name = notebook.name;
+    const namespace = notebook.namespace;
+    const url = `api/namespaces/${namespace}/notebooks/${name}`;
+
+    return this.http.patch<JWABackendResponse>(url, { istemplate: true }).pipe(
+      catchError(error => this.handleError(error)),
+      map(_ => {
+        return 'started';
+      }),
+    );
+  }
+
+  public disableTemplateNotebook(notebook: NotebookProcessedObject): Observable<string> {
+    const name = notebook.name;
+    const namespace = notebook.namespace;
+    const url = `api/namespaces/${namespace}/notebooks/${name}`;
+
+    return this.http.patch<JWABackendResponse>(url, { istemplate: false }).pipe(
+      catchError(error => this.handleError(error)),
+      map(_ => {
+        return 'stopped';
+      }),
+    );
+  }
+
+  // Lance - End - 20230818
+
   // POST
   public createNotebook(notebook: NotebookFormObject): Observable<string> {
     const url = `api/namespaces/${notebook.namespace}/notebooks`;

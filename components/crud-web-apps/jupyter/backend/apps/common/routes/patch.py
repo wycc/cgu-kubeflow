@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 STOP_ATTR = "stopped"
 ISTEMPLATE = "istemplate"
-ATTRIBUTES = set([STOP_ATTR, STOP_ATTR])
+ATTRIBUTES = set([STOP_ATTR, ISTEMPLATE])
 
 
 # Routes
@@ -52,12 +52,12 @@ def enable_disable_template_notebook(namespace, notebook, request_body):
         log.info("Enable Notebook as Template '%s/%s'", namespace, notebook)
 
         patch_body = {
-            "metadata": {"labels": {"isTemplate": "yes"}}
+            "metadata": {"labels": {"isTemplateName": "yes"}}
         }
     else:
         log.info("Disable Notebook as Template '%s/%s'", namespace, notebook)
         patch_body = {
-            "metadata": {"labels": {"isTemplate": "no"}}
+            "metadata": {"labels": {"isTemplateName": "no"}}
         }
 
     log.info(
