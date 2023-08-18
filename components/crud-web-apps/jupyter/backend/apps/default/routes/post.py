@@ -5,6 +5,8 @@ from kubeflow.kubeflow.crud_backend import api, decorators, helpers, logging
 from ...common import form, utils, volumes
 from . import bp
 
+import json
+
 log = logging.getLogger(__name__)
 
 
@@ -15,12 +17,17 @@ def post_pvc(namespace):
     body = request.get_json()
     log.info("Got body: %s" % body)
 
+    # Convert dict to string
+    data = json.dumps(body)
+    log.info("Got data: %s" % data)
+    
     notebook = helpers.load_param_yaml(
         utils.NOTEBOOK_TEMPLATE_YAML,
         name=body["name"],
         namespace=namespace,
         isTemplate =  '\"'+body["isTemplate"]+'\"',
         serviceAccount="default-editor",
+        jsonStr = '\'' + data + '\'',
     )
 
     defaults = utils.load_spawner_ui_config()

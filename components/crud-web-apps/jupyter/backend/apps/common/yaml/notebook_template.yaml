@@ -8,6 +8,7 @@ metadata:
     isTemplateName: {isTemplate}
   annotations:
     notebooks.kubeflow.org/server-type: ""
+    jsonStr: {jsonStr}
 spec:
   template:
     spec:

@@ -133,6 +133,13 @@ def notebook_dict_from_k8s_obj(notebook):
 
     log.info("Got isTemplate: %s" % isTemplate)
 
+    jsonStr = ""
+    if notebook["metadata"].get("annotations"):
+        annotations = notebook["metadata"]["annotations"]
+        jsonStr = annotations.get("jsonStr")
+
+    log.info("Got jsonStr: %s" % jsonStr)
+
     return {
         "name": notebook["metadata"]["name"],
         "namespace": notebook["metadata"]["namespace"],
@@ -147,4 +154,5 @@ def notebook_dict_from_k8s_obj(notebook):
         "volumes": [v["name"] for v in cntr["volumeMounts"]],
         "status": status.process_status(notebook),
         "isTemplate": isTemplate,
+        "jsonStr": jsonStr,
     }

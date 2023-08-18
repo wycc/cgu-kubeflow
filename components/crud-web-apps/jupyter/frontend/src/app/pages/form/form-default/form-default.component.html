@@ -23,8 +23,8 @@
             </mat-card-header>
             <mat-card-content>{{ notebook.isTemplate }}</mat-card-content> 
             <mat-card-actions> 
-              <button mat-button color="paimray">test</button> 
-              <button mat-button color="accent">test2</button> 
+              <button mat-button [disabled]="!formCtrl.valid || blockSubmit" color="paimray" (click)="onCreateNotebook(notebook.jsonStr)">Launch</button> 
+              <button mat-button color="accent"></button> 
             </mat-card-actions> 
             <mat-card-footer>{{ notebook.shortImage }}</mat-card-footer> 
           </mat-card>          
@@ -33,16 +33,6 @@
     </mat-grid-list>
 
     <div class="form-buttons">
-      <button
-        mat-raised-button
-        color="primary"
-        (click)="onSubmit()"
-        [disabled]="!formCtrl.valid || blockSubmit"
-        i18n
-      >
-        LAUNCH
-      </button>
-
       <button mat-raised-button type="button" (click)="onAdvanced()" i18n>
         ADVANCED
       </button>

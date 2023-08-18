@@ -146,7 +146,7 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
   getSubmitNotebook(): NotebookFormObject {
     const notebookCopy = this.formCtrl.value as NotebookFormObject;
     const notebook = JSON.parse(JSON.stringify(notebookCopy));
-
+    // console.log("notebookCopy", JSON.stringify(notebookCopy))
     // Use the custom image instead
     if (notebook.customImageCheck) {
       notebook.image = notebook.customImage;
@@ -199,7 +199,7 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
       }
     }
 
-    notebook.isTemplate = 'yes';
+    notebook.isTemplate = 'no';
 
     return notebook;
   }
@@ -228,4 +228,22 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
     this.applying$.next(true);
   }
 
+  onCreateNotebook(notebookCopy) {
+    // alert(notebook);
+    const notebookFormCopy = this.formCtrl.value as NotebookFormObject;
+    const notebookForm = JSON.parse(JSON.stringify(notebookFormCopy));
+
+    const notebook = JSON.parse(notebookCopy);
+    notebook.name = notebookForm.name;
+    notebook.workspace.newPvc.metadata.name = notebookForm.name + "-volume";
+    this.backend.createNotebook(notebook).subscribe(() => {
+      this.popup.close();
+      this.popup.open(
+        'Notebook created successfully.',
+        SnackType.Success,
+        3000,
+      );
+      this.router.navigate(['/']);
+    });
+  }
 }
