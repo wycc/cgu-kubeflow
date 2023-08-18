@@ -11,7 +11,8 @@ from . import bp
 log = logging.getLogger(__name__)
 
 STOP_ATTR = "stopped"
-ATTRIBUTES = set([STOP_ATTR])
+ISTEMPLATE = "istemplate"
+ATTRIBUTES = set([STOP_ATTR, STOP_ATTR])
 
 
 # Routes
@@ -37,8 +38,32 @@ def patch_notebook(namespace, notebook):
     if STOP_ATTR in request_body:
         start_stop_notebook(namespace, notebook, request_body)
 
+    if ISTEMPLATE in request_body:
+        enable_disable_template_notebook(namespace, notebook, request_body)
+
     return api.success_response()
 
+# helper functions
+def enable_disable_template_notebook(namespace, notebook, request_body):
+    istemplate = request_body[ISTEMPLATE]
+
+    patch_body = {}
+    if istemplate:
+        log.info("Enable Notebook as Template '%s/%s'", namespace, notebook)
+
+        patch_body = {
+            "metadata": {"labels": {"isTemplate": "yes"}}
+        }
+    else:
+        log.info("Disable Notebook as Template '%s/%s'", namespace, notebook)
+        patch_body = {
+            "metadata": {"labels": {"isTemplate": "no"}}
+        }
+
+    log.info(
+        "Sending PATCH to Notebook %s/%s: %s", namespace, notebook, patch_body
+    )
+    api.patch_notebook(notebook, namespace, patch_body)
 
 # helper functions
 def start_stop_notebook(namespace, notebook, request_body):

@@ -105,7 +105,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   reactToAction(a: ActionEvent) {
     switch (a.action) {
       case 'copy':
-        alert("Test");
+        this.copyClicked(a.data);
         break;
       case 'delete':
         this.deleteVolumeClicked(a.data);
@@ -117,6 +117,71 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         this.startStopClicked(a.data);
         break;
     }
+  }
+
+  public copyClicked(notebook: NotebookProcessedObject) {
+    if (notebook.isTemplate === 'yes') {
+      this.disableTemplateNotebook(notebook);
+    } else {
+      this.enableTemplateNotebook(notebook);
+    }
+  }
+
+  public enableTemplateNotebook(notebook: NotebookProcessedObject) {
+    this.snackBar.open(
+      $localize`Starting Notebook server '${notebook.name}'...`,
+      SnackType.Info,
+      3000,
+    );
+
+    notebook.status.phase = STATUS_TYPE.WAITING;
+    notebook.status.message = 'Starting the Notebook Server...';
+    this.updateNotebookFields(notebook);
+
+    this.backend.startNotebook(notebook).subscribe(() => {
+      this.poller.reset();
+    });
+  }
+
+  public disableTemplateNotebook(notebook: NotebookProcessedObject) {
+    const stopDialogConfig = getStopDialogConfig(notebook.name);
+    const ref = this.confirmDialog.open(notebook.name, stopDialogConfig);
+    const stopSub = ref.componentInstance.applying$.subscribe(applying => {
+      if (!applying) {
+        return;
+      }
+
+      // Close the open dialog only if the request succeeded
+      this.backend.stopNotebook(notebook).subscribe({
+        next: _ => {
+          this.poller.reset();
+          ref.close(DIALOG_RESP.ACCEPT);
+        },
+        error: err => {
+          const errorMsg = err;
+          stopDialogConfig.error = errorMsg;
+          ref.componentInstance.applying$.next(false);
+        },
+      });
+
+      // request has succeeded
+      ref.afterClosed().subscribe(res => {
+        stopSub.unsubscribe();
+        if (res !== DIALOG_RESP.ACCEPT) {
+          return;
+        }
+
+        this.snackBar.open(
+          $localize`Stopping Notebook server '${notebook.name}'...`,
+          SnackType.Info,
+          3000,
+        );
+
+        notebook.status.phase = STATUS_TYPE.TERMINATING;
+        notebook.status.message = 'Preparing to stop the Notebook Server...';
+        this.updateNotebookFields(notebook);
+      });
+    });
   }
 
   public deleteVolumeClicked(notebook: NotebookProcessedObject) {
@@ -246,9 +311,15 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
 
   // Action handling functions
   processCopyActionStatus(notebook: NotebookProcessedObject) {
-    if (notebook.status.phase !== STATUS_TYPE.TERMINATING) {
+
+    if (notebook.isTemplate !== 'yes') {
       return STATUS_TYPE.READY;
     }
+
+    // Lance
+    // if (notebook.status.phase !== STATUS_TYPE.TERMINATING) {
+    //    return STATUS_TYPE.READY;
+    //  }
 
     return STATUS_TYPE.TERMINATING;
   }
