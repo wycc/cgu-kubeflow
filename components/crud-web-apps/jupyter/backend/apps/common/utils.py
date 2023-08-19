@@ -155,4 +155,6 @@ def notebook_dict_from_k8s_obj(notebook):
         "status": status.process_status(notebook),
         "isTemplate": isTemplate,
         "jsonStr": jsonStr,
+        "shortImageName": cntr["image"].split("/")[-1].split(":")[0],
+        "shortImageVersion": cntr["image"].split("/")[-1].split(":")[1],
     }

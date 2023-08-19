@@ -23,6 +23,8 @@ export interface NotebookResponseObject {
   shortImage: string;
   isTemplate: string;
   jsonStr: string;
+  shortImageName: string;
+  shortImageVersion: string;
 }
 
 export interface NotebookProcessedObject extends NotebookResponseObject {
