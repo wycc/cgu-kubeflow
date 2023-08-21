@@ -33,7 +33,7 @@ import {
   styleUrls: ['./form-default.component.scss'],
 })
 export class FormDefaultComponent implements OnInit, OnDestroy {
-  public isBasic = true;
+  public isBasic = false;
   public applying$ = new Subject <boolean>();
 
   configAdvance = defaultAdvancedConfig;
@@ -66,6 +66,23 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Initialize the form control
     this.formCtrl = this.getFormDefaults();
+
+    this.backend.getUsername().subscribe(username => {
+      if (Object.keys(username).length === 0) {
+        // Don't fire on empty config
+        //console.log("NO username")
+        this.isBasic = true;
+        return;
+      }
+
+      if( username.substring(0,1) === "D" || username.substring(0,1) === "d" )
+        this.isBasic = true;
+      else
+        this.isBasic = false;
+
+      // alert(username.substring(0,1));
+      //console.log("username", username)
+    });
 
     // Update the form Values from the default ones
     this.backend.getConfig().subscribe(config => {

@@ -68,6 +68,23 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.poller = new ExponentialBackoff({ interval: 1000, retries: 3 });
 
+    this.backend.getUsername().subscribe(username => {
+      if (Object.keys(username).length === 0) {
+        // Don't fire on empty config
+        //console.log("NO username")
+        this.isBasic = true;
+        return;
+      }
+
+      if( username.substring(0,1) === "D" || username.substring(0,1) === "d" )
+        this.isBasic = false;
+      else
+        this.isBasic = true;
+
+      // alert(username.substring(0,1));
+      //console.log("username", username)
+    });
+
     // Poll for new data and reset the poller if different data is found
     this.subs.add(
       this.poller.start().subscribe(() => {
@@ -112,6 +129,19 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
           break;        
       case 'delete':
         this.deleteVolumeClicked(a.data);
+        /*
+        this.backend.getUsername().subscribe(username => {
+          if (Object.keys(username).length === 0) {
+            // Don't fire on empty config
+            console.log("NO username")
+            alert("NO username");
+            return;
+          }
+    
+          console.log("username", username)
+          alert(username);
+        });
+        */
         break;
       case 'connect':
         this.connectClicked(a.data);
