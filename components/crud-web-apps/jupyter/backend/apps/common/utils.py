@@ -126,7 +126,7 @@ def notebook_dict_from_k8s_obj(notebook):
         annotations = notebook["metadata"]["annotations"]
         server_type = annotations.get("notebooks.kubeflow.org/server-type")
 
-    isTemplate = None
+    isTemplate = "no"
     if notebook["metadata"].get("labels"):
         labels = notebook["metadata"]["labels"]
         isTemplate = labels.get("isTemplateName")

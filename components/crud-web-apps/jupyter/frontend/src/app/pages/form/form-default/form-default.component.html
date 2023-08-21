@@ -8,7 +8,7 @@
 
   <!--scrollable page content-->
   <div *ngIf="isBasic" class="page-padding lib-flex-grow lib-overflow-auto">
-    <div class="form-buttons" align="right">
+    <div *ngIf="isTeached" class="form-buttons" align="right">
       <button mat-raised-button type="button" (click)="onAdvanced()" i18n>
         ADVANCED
       </button>

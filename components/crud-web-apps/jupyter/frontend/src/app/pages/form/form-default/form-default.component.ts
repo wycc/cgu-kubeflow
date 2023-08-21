@@ -32,8 +32,10 @@ import {
   templateUrl: './form-default.component.html',
   styleUrls: ['./form-default.component.scss'],
 })
+
 export class FormDefaultComponent implements OnInit, OnDestroy {
-  public isBasic = false;
+  public isBasic = true;
+  public isTeached = false;
   public applying$ = new Subject <boolean>();
 
   configAdvance = defaultAdvancedConfig;
@@ -71,14 +73,14 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
       if (Object.keys(username).length === 0) {
         // Don't fire on empty config
         //console.log("NO username")
-        this.isBasic = true;
+        this.isTeached = false;
         return;
       }
 
       if( username.substring(0,1) === "D" || username.substring(0,1) === "d" )
-        this.isBasic = true;
+        this.isTeached = true;
       else
-        this.isBasic = false;
+        this.isTeached = false;
 
       // alert(username.substring(0,1));
       //console.log("username", username)
@@ -103,7 +105,8 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
 
         // Lance - begin - 20230817
         if (this.currNamespace) {
-          this.backend.getNotebooks(this.currNamespace).subscribe(notebooks => {
+          // this.backend.getNotebooks(this.currNamespace).subscribe(notebooks => {
+            this.backend.getAllNotebooks(this.currNamespace).subscribe(notebooks => {
             if (!isEqual(this.rawData, notebooks)) {
               this.rawData = notebooks;
 
@@ -245,13 +248,14 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
     this.applying$.next(true);
   }
 
-onCreateNotebook(notebookCopy) {
+  onCreateNotebook(notebookCopy) {
     // alert(notebook);
     const notebookFormCopy = this.formCtrl.value as NotebookFormObject;
     const notebookForm = JSON.parse(JSON.stringify(notebookFormCopy));
 
     const notebook = JSON.parse(notebookCopy);
     notebook.name = notebookForm.name;
+    notebook.namespace = this.currNamespace
     notebook.workspace.newPvc.metadata.name = notebookForm.name + "-volume";
     this.backend.createNotebook(notebook).subscribe(() => {
       this.popup.close();

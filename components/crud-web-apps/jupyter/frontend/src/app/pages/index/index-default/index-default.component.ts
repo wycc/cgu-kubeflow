@@ -24,6 +24,9 @@ import { isEqual } from 'lodash';
 import { NotebookResponseObject, NotebookProcessedObject } from 'src/app/types';
 import { Router } from '@angular/router';
 
+import { MatDialog } from '@angular/material/dialog';
+// import { AddPostDialogComponent } from './add-post-dialog/add-post-dialog.component';
+
 @Component({
   selector: 'app-index-default',
   templateUrl: './index-default.component.html',
@@ -63,6 +66,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     public confirmDialog: ConfirmDialogService,
     public snackBar: SnackBarService,
     public router: Router,
+    // public dialog: MatDialog,
   ) {}
 
   ngOnInit(): void {
@@ -410,5 +414,17 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
 
   public notebookTrackByFn(index: number, notebook: NotebookProcessedObject) {
     return `${notebook.name}/${notebook.image}`;
+  }
+
+  showAddPostDialog() {
+
+    //this.dialog.open(AddPostDialogComponent, {
+    //  hasBackdrop: false
+    //});
+
+    //this.dialog.open(AddPostDialogComponent, {
+    //  width: '600px',
+    //  panelClass: 'form--dialog-padding',
+    //});
   }
 }

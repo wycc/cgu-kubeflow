@@ -29,6 +29,13 @@ def list_notebooks(namespace):
         "kubeflow.org", "v1beta1", namespace, "notebooks"
     )
 
+def list_all_notebooks(namespace):
+    authz.ensure_authorized(
+        "list", "kubeflow.org", "v1beta1", "notebooks", namespace
+    )
+    return custom_api.list_cluster_custom_object(
+        "kubeflow.org", "v1beta1", "notebooks"
+    )
 
 def delete_notebook(notebook, namespace):
     authz.ensure_authorized(
