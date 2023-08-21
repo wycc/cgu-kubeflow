@@ -147,7 +147,7 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
     const notebookCopy = this.formCtrl.value as NotebookFormObject;
     const notebook = JSON.parse(JSON.stringify(notebookCopy));
     // console.log("notebookCopy", JSON.stringify(notebookCopy))
-    // Use the custom image instead
+        // Use the custom image instead
     if (notebook.customImageCheck) {
       notebook.image = notebook.customImage;
     } else if (notebook.serverType === 'group-one') {
@@ -228,7 +228,7 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
     this.applying$.next(true);
   }
 
-  onCreateNotebook(notebookCopy) {
+onCreateNotebook(notebookCopy) {
     // alert(notebook);
     const notebookFormCopy = this.formCtrl.value as NotebookFormObject;
     const notebookForm = JSON.parse(JSON.stringify(notebookFormCopy));

@@ -27,6 +27,8 @@ export class JWABackendService extends BackendService {
     return this.http.get<JWABackendResponse>(url).pipe(
       catchError(error => this.handleError(error)),
       map((resp: JWABackendResponse) => {
+        console.log("resp.usery", resp.user)
+        resp.user
         return resp.notebooks;
       }),
     );

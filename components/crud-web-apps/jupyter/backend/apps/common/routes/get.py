@@ -1,10 +1,28 @@
 from kubeflow.kubeflow.crud_backend import api, logging
 
+from flask import request
 from .. import utils
 from . import bp
+import os
 
 log = logging.getLogger(__name__)
 
+SECURE_COOKIES = os.getenv("APP_SECURE_COOKIES", "true").lower() == "true"
+DISABLE_AUTH = os.getenv("APP_DISABLE_AUTH", "false").lower() == "true"
+USER_HEADER = os.getenv("USERID_HEADER", "kubeflow-userid")
+USER_PREFIX = os.getenv("USERID_PREFIX", ":")
+
+def get_username():
+    if USER_HEADER not in request.headers:
+        log.debug("User header not present!")
+        username = None
+    else:
+        user = request.headers[USER_HEADER]
+        username = user.replace(USER_PREFIX, "")
+        log.info("User: '%s' | Headers: '%s' '%s'",
+                  username, USER_HEADER, USER_PREFIX)
+
+    return username
 
 @bp.route("/api/config")
 def get_config():
@@ -43,6 +61,14 @@ def get_poddefaults(namespace):
 
 @bp.route("/api/namespaces/<namespace>/notebooks")
 def get_notebooks(namespace):
+
+    log.info("Get %s notebook", namespace)
+
+    user = get_username()
+    log.info("Handling request for user: %s", user)
+    first = user[0]
+    log.info("Handling request for user: %c", first)
+
     notebooks = api.list_notebooks(namespace)["items"]
     contents = [utils.notebook_dict_from_k8s_obj(nb) for nb in notebooks]
 
