@@ -140,6 +140,12 @@ def notebook_dict_from_k8s_obj(notebook):
 
     log.info("Got jsonStr: %s" % jsonStr)
 
+    shortImageVersion = ""
+    lst = cntr["image"].split("/")[-1].split(":")
+    stringcount = len(lst)
+    if stringcount>=2:
+        shortImageVersion = cntr["image"].split("/")[-1].split(":")[1]
+
     return {
         "name": notebook["metadata"]["name"],
         "namespace": notebook["metadata"]["namespace"],
@@ -156,5 +162,5 @@ def notebook_dict_from_k8s_obj(notebook):
         "isTemplate": isTemplate,
         "jsonStr": jsonStr,
         "shortImageName": cntr["image"].split("/")[-1].split(":")[0],
-        "shortImageVersion": cntr["image"].split("/")[-1].split(":")[1],
+        "shortImageVersion": shortImageVersion,
     }

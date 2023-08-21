@@ -33,6 +33,18 @@ export class JWABackendService extends BackendService {
     );
   }
 
+  public getAllNotebooks(namespace: string): Observable<NotebookResponseObject[]> {
+    const url = `api/namespaces/${namespace}/allnotebooks`;
+
+    return this.http.get<JWABackendResponse>(url).pipe(
+      catchError(error => this.handleError(error)),
+      map((resp: JWABackendResponse) => {
+        // console.log("resp.usery", resp.user)
+        return resp.notebooks;
+      }),
+    );
+  }
+
   public getConfig(): Observable<Config> {
     const url = `api/config`;
 
