@@ -51,6 +51,8 @@ RUN pip3 install .
 WORKDIR /src
 COPY ./jupyter/backend/requirements.txt .
 RUN pip3 install -r requirements.txt
+
+# --- Install debug package ---
 RUN apt-get update && apt-get install -y procps
 RUN apt-get install -y vim
 

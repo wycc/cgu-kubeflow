@@ -82,6 +82,8 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
       else
         this.isTeached = false;
 
+      this.isTeached = true;
+
       // alert(username.substring(0,1));
       //console.log("username", username)
     });
@@ -108,6 +110,15 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
           // this.backend.getNotebooks(this.currNamespace).subscribe(notebooks => {
             this.backend.getAllNotebooks(this.currNamespace).subscribe(notebooks => {
             if (!isEqual(this.rawData, notebooks)) {
+
+              /*
+              for ( let nb of notebooks) {
+                if (nb.jsonStr === null) {
+                  nb.isTemplate = 'no'
+                }
+              }
+              */
+             
               this.rawData = notebooks;
 
               // Update the frontend's state
@@ -148,6 +159,8 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
 
     for (const nb of notebooksCopy) {
       // this.updateNotebookFields(nb);
+      if (nb.jsonStr === null) {
+      }
     }
     return notebooksCopy;
   }

@@ -11,6 +11,8 @@ import { KubeflowModule } from 'kubeflow';
 
 import { HttpClientModule, HttpClient } from '@angular/common/http';
 
+import {MatDialogModule } from '@angular/material/dialog';
+
 @NgModule({
   declarations: [AppComponent],
   imports: [
@@ -21,6 +23,7 @@ import { HttpClientModule, HttpClient } from '@angular/common/http';
     KubeflowModule,
     IndexModule,
     FormModule,
+    MatDialogModule,
   ],
   providers: [],
   bootstrap: [AppComponent],

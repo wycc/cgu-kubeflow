@@ -120,6 +120,9 @@ def get_notebook_last_activity(notebook):
 
 
 def notebook_dict_from_k8s_obj(notebook):
+
+    log.info("Parsing notebook: %s" % notebook["metadata"]["name"])
+
     cntr = notebook["spec"]["template"]["spec"]["containers"][0]
     server_type = None
     if notebook["metadata"].get("annotations"):
@@ -140,6 +143,10 @@ def notebook_dict_from_k8s_obj(notebook):
 
     log.info("Got jsonStr: %s" % jsonStr)
 
+    if not jsonStr:
+        isTemplate = "no"
+    log.info("Got isTemplate: %s" % isTemplate)
+    
     shortImageVersion = ""
     lst = cntr["image"].split("/")[-1].split(":")
     stringcount = len(lst)

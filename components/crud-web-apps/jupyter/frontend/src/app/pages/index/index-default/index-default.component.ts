@@ -25,7 +25,7 @@ import { NotebookResponseObject, NotebookProcessedObject } from 'src/app/types';
 import { Router } from '@angular/router';
 
 import { MatDialog } from '@angular/material/dialog';
-// import { AddPostDialogComponent } from './add-post-dialog/add-post-dialog.component';
+import { AddPostDialogComponent } from './add-post-dialog/add-post-dialog.component';
 
 @Component({
   selector: 'app-index-default',
@@ -41,6 +41,8 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   configAdvance = defaultAdvancedConfig;
   config = defaultConfig;
   subs = new Subscription();
+
+  currentName = '';
 
   //if (isBasicSetting) {
   //  this.config = defaultConfig;
@@ -66,7 +68,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     public confirmDialog: ConfirmDialogService,
     public snackBar: SnackBarService,
     public router: Router,
-    // public dialog: MatDialog,
+    public dialog: MatDialog,
   ) {}
 
   ngOnInit(): void {
@@ -259,7 +261,8 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
 
   public connectClicked(notebook: NotebookProcessedObject) {
     // Open new tab to work on the Notebook
-    window.open(`/notebook/${notebook.namespace}/${notebook.name}/`);
+    // window.open(`/notebook/${notebook.namespace}/${notebook.name}/`);
+    this.showAddPostDialog(notebook);
   }
 
   public startStopClicked(notebook: NotebookProcessedObject) {
@@ -350,6 +353,9 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   // Action handling functions
   processSetTemplateActionStatus(notebook: NotebookProcessedObject) {
 
+    if (notebook.jsonStr === null) 
+      return STATUS_TYPE.TERMINATING;
+    
     if (notebook.isTemplate !== 'yes') {
       return STATUS_TYPE.READY;
     }
@@ -416,11 +422,13 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     return `${notebook.name}/${notebook.image}`;
   }
 
-  showAddPostDialog() {
+  showAddPostDialog(notebook: NotebookProcessedObject) {
 
-    //this.dialog.open(AddPostDialogComponent, {
-    //  hasBackdrop: false
-    //});
+    this.currentName = notebook.name;
+    this.dialog.open(AddPostDialogComponent, {
+      hasBackdrop: false,
+      data: {imageName: "aaa", imageVersion: "bbb", courseName: "ccc", notebook: notebook}
+    });
 
     //this.dialog.open(AddPostDialogComponent, {
     //  width: '600px',

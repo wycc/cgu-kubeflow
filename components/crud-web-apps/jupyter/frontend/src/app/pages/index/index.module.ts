@@ -6,6 +6,7 @@ import { IndexDefaultModule } from './index-default/index-default.module';
 import { IndexComponent } from './index.component';
 import { ServerTypeComponent } from './index-default/server-type/server-type.component';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import {MatDialogModule } from '@angular/material/dialog';
 
 @NgModule({
   declarations: [IndexComponent, ServerTypeComponent],
@@ -15,6 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     IndexDefaultModule,
     MatIconModule,
     MatTooltipModule,
+    MatDialogModule,
   ],
 })
 export class IndexModule {}

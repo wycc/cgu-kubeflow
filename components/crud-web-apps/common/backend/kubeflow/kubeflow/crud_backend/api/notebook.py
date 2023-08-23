@@ -34,7 +34,7 @@ def list_all_notebooks(namespace):
         "list", "kubeflow.org", "v1beta1", "notebooks", namespace
     )
     return custom_api.list_cluster_custom_object(
-        "kubeflow.org", "v1beta1", "notebooks"
+        "kubeflow.org", "v1beta1", "notebooks", label_selector="isTemplateName=yes"
     )
 
 def delete_notebook(notebook, namespace):
