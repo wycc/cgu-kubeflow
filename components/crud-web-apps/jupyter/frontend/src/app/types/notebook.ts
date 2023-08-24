@@ -25,6 +25,9 @@ export interface NotebookResponseObject {
   jsonStr: string;
   shortImageName: string;
   shortImageVersion: string;
+  customerImageName: string;
+  customerImageVersion: string;
+  customerCourseName: string;
 }
 
 export interface NotebookProcessedObject extends NotebookResponseObject {
@@ -58,4 +61,7 @@ export interface NotebookFormObject {
   shm: boolean;
   configurations: PodDefault[];
   isTemplate: string;
+  customerImageName: string;
+  customerImageVersion: string;
+  customerCourseName: string;
 }

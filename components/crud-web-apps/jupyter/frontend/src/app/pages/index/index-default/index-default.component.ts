@@ -170,7 +170,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     this.snackBar.open(
       $localize`Set Notebook as template '${notebook.name}'...`,
       SnackType.Info,
-      3000,
+      1000,
     );
 
     notebook.status.phase = STATUS_TYPE.WAITING;
@@ -180,6 +180,8 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     this.backend.enableTemplateNotebook(notebook).subscribe(() => {
       this.poller.reset();
     });
+
+    this.showAddPostDialog(notebook);
   }
 
   public disableTemplateNotebook(notebook: NotebookProcessedObject) {
@@ -213,7 +215,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         this.snackBar.open(
           $localize`Disable Notebook as template '${notebook.name}'...`,
           SnackType.Info,
-          3000,
+          1000,
         );
 
         notebook.status.phase = STATUS_TYPE.TERMINATING;
@@ -261,8 +263,22 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
 
   public connectClicked(notebook: NotebookProcessedObject) {
     // Open new tab to work on the Notebook
-    // window.open(`/notebook/${notebook.namespace}/${notebook.name}/`);
-    this.showAddPostDialog(notebook);
+    window.open(`/notebook/${notebook.namespace}/${notebook.name}/`);
+    // this.showAddPostDialog(notebook);
+
+    /*
+    this.backend.setCustomerParamNotebook(notebook,'customerImageName', 'qqqqqqqq').subscribe(() => {
+      this.poller.reset();
+    });
+
+    this.backend.setCustomerParamNotebook(notebook,'customerImageVersion', 'wwwwwwww').subscribe(() => {
+      this.poller.reset();
+    });
+
+    this.backend.setCustomerParamNotebook(notebook,'customerCourseName', 'eeeeeeee').subscribe(() => {
+      this.poller.reset();
+    });
+    */
   }
 
   public startStopClicked(notebook: NotebookProcessedObject) {
@@ -427,7 +443,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     this.currentName = notebook.name;
     this.dialog.open(AddPostDialogComponent, {
       hasBackdrop: false,
-      data: {imageName: "aaa", imageVersion: "bbb", courseName: "ccc", notebook: notebook}
+      data: { notebook: notebook}
     });
 
     //this.dialog.open(AddPostDialogComponent, {

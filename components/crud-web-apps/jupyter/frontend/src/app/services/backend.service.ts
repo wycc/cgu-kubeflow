@@ -92,6 +92,21 @@ export class JWABackendService extends BackendService {
 
   // PATCH
   // Lance - Begin - 20230818
+  public setCustomerParamNotebook(notebook: NotebookProcessedObject, jsonTag: string, jsonValue:string): Observable<string> {
+    const name = notebook.name;
+    const namespace = notebook.namespace;
+    const url = `api/namespaces/${namespace}/notebooks/${name}`;
+
+    var obj = {};
+    obj[jsonTag] = jsonValue;
+    return this.http.patch<JWABackendResponse>(url, obj).pipe(
+      catchError(error => this.handleError(error)),
+      map(_ => {
+        return 'started';
+      }),
+    );
+  }
+
   public enableTemplateNotebook(notebook: NotebookProcessedObject): Observable<string> {
     const name = notebook.name;
     const namespace = notebook.namespace;

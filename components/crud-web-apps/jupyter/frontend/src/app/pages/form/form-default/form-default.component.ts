@@ -18,6 +18,8 @@ import { environment } from '@app/environment';
 // Lance - begin - 20230817
 import { isEqual } from 'lodash';
 import { NotebookResponseObject, NotebookProcessedObject } from 'src/app/types';
+import { MatDialog } from '@angular/material/dialog';
+import { AddPostDialogComponent } from '../../index/index-default/add-post-dialog/add-post-dialog.component';
 // Lance - end - 20230817
 
 import {
@@ -63,6 +65,7 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
     public backend: JWABackendService,
     public router: Router,
     public popup: SnackBarService,
+    public dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -261,6 +264,10 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
     this.applying$.next(true);
   }
 
+  onEdit(notebook: NotebookProcessedObject) {
+    this.showAddPostDialog(notebook);
+  }
+
   onCreateNotebook(notebookCopy) {
     // alert(notebook);
     const notebookFormCopy = this.formCtrl.value as NotebookFormObject;
@@ -279,5 +286,24 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
       );
       this.router.navigate(['/']);
     });
+  }
+
+  showAddPostDialog(notebook: NotebookProcessedObject) {
+
+    const ref = this.dialog.open(AddPostDialogComponent, {
+      hasBackdrop: false,
+      data: { notebook: notebook}
+    });
+
+    ref.afterClosed().subscribe(res => {
+        window.location.reload();
+        // alert("kkkkk");
+    });
+
+    
+    //this.dialog.open(AddPostDialogComponent, {
+    //  width: '600px',
+    //  panelClass: 'form--dialog-padding',
+    //});
   }
 }

@@ -141,8 +141,6 @@ def notebook_dict_from_k8s_obj(notebook):
         annotations = notebook["metadata"]["annotations"]
         jsonStr = annotations.get("jsonStr")
 
-    log.info("Got jsonStr: %s" % jsonStr)
-
     if not jsonStr:
         isTemplate = "no"
     log.info("Got isTemplate: %s" % isTemplate)
@@ -152,6 +150,27 @@ def notebook_dict_from_k8s_obj(notebook):
     stringcount = len(lst)
     if stringcount>=2:
         shortImageVersion = cntr["image"].split("/")[-1].split(":")[1]
+
+    customerImageName = ""
+    if notebook["metadata"].get("annotations"):
+        annotations = notebook["metadata"]["annotations"]
+        customerImageName = annotations.get("customerImageName")
+
+    log.info("Got customerImageName: %s" % customerImageName)
+
+    customerImageVersion = ""
+    if notebook["metadata"].get("annotations"):
+        annotations = notebook["metadata"]["annotations"]
+        customerImageVersion = annotations.get("customerImageVersion")
+
+    log.info("Got customerImageVersion: %s" % customerImageVersion)
+
+    customerCourseName = ""
+    if notebook["metadata"].get("annotations"):
+        annotations = notebook["metadata"]["annotations"]
+        customerCourseName = annotations.get("customerCourseName")
+
+    log.info("Got customerCourseName: %s" % customerCourseName)
 
     return {
         "name": notebook["metadata"]["name"],
@@ -170,4 +189,7 @@ def notebook_dict_from_k8s_obj(notebook):
         "jsonStr": jsonStr,
         "shortImageName": cntr["image"].split("/")[-1].split(":")[0],
         "shortImageVersion": shortImageVersion,
+        "customerImageName": customerImageName,
+        "customerImageVersion": customerImageVersion,
+        "customerCourseName": customerCourseName,
     }

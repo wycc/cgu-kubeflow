@@ -3,6 +3,7 @@ import { MatDialog, MatDialogRef, MAT_DIALOG_DATA} from '@angular/material/dialo
 import { MatChipInputEvent } from '@angular/material/chips';
 import { AddPostConfirmDialogComponent } from '../add-post-confirm-dialog/add-post-confirm-dialog.component';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
+import { JWABackendService } from 'src/app/services/backend.service';
 
 import { NotebookResponseObject, NotebookProcessedObject } from 'src/app/types';
 
@@ -20,7 +21,7 @@ export class AddPostDialogComponent implements OnInit {
 
   tags = ['JavaScript', 'Material Design', 'Angular Material'];
   separatorKeysCodes = [ENTER, COMMA];
-  constructor(private dialogRef: MatDialogRef<AddPostDialogComponent>, private dialog: MatDialog, @Inject(MAT_DIALOG_DATA) public data: any) {}
+  constructor(private dialogRef: MatDialogRef<AddPostDialogComponent>, public backend: JWABackendService, @Inject(MAT_DIALOG_DATA) public data: any) {}
 
   ngOnInit() {
     //this.imageName = this.data.imageName
@@ -28,12 +29,13 @@ export class AddPostDialogComponent implements OnInit {
     //this.courseName = this.data.courseName
 
     this.notebook = this.data.notebook
-    this.imageName = this.notebook.name
-    this.imageVersion = this.notebook.shortImageVersion
-    this.courseName = this.notebook.shortImageName
+    this.imageName = this.notebook.customerImageName
+    this.imageVersion = this.notebook.customerImageVersion
+    this.courseName = this.notebook.customerCourseName
   }
 
   doPost() {
+    /*
     const confirmDialogRef = this.dialog.open(AddPostConfirmDialogComponent, {
       data: {
         title: this.title
@@ -42,6 +44,20 @@ export class AddPostDialogComponent implements OnInit {
     confirmDialogRef.componentInstance.doConfirm.subscribe(() => {
       console.log('開啟的dialog按下確認按鈕了');
     });
+    */
+
+    this.backend.setCustomerParamNotebook(this.notebook,'customerImageName', this.imageName).subscribe(() => {
+      //this.poller.reset();
+    });
+
+    this.backend.setCustomerParamNotebook(this.notebook,'customerImageVersion', this.imageVersion).subscribe(() => {
+      //this.poller.reset();
+    });
+
+    this.backend.setCustomerParamNotebook(this.notebook,'customerCourseName', this.courseName).subscribe(() => {
+      //this.poller.reset();
+    });
+    this.dialogRef.close();
   }
 
   move() {

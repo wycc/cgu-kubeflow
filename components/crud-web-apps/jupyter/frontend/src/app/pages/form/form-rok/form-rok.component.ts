@@ -7,6 +7,7 @@ import { Router } from '@angular/router';
 import { getFormDefaults, initFormControls } from '../form-default/utils';
 import { JWABackendService } from 'src/app/services/backend.service';
 import { FormDefaultComponent } from '../form-default/form-default.component';
+import { MatDialog } from '@angular/material/dialog';
 
 @Component({
   selector: 'app-form-rok',
@@ -27,9 +28,10 @@ export class FormRokComponent
     public backend: JWABackendService,
     public router: Router,
     public popup: SnackBarService,
+    public dialog: MatDialog,
     public rok: RokService,
   ) {
-    super(ns, backend, router, popup);
+    super(ns, backend, router, popup, dialog);
   }
 
   ngOnInit() {

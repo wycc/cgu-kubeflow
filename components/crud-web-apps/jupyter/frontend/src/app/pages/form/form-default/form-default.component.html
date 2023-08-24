@@ -23,16 +23,16 @@
         <mat-grid-tile *ngIf="notebook.isTemplate==='yes'" >
           <mat-card class="post-tile"> 
             <mat-card-header>
-              <mat-card-title>{{ notebook.name }}</mat-card-title>
+              <mat-card-title>{{ notebook.customerCourseName }}</mat-card-title>
               <mat-card-subtitle>{{ notebook.age }}</mat-card-subtitle>
               <img mat-card-avatar src="https://picsum.photos/300/300/?random" />
             </mat-card-header>
-            <mat-card-content>{{ notebook.shortImageName }}</mat-card-content> 
+            <mat-card-content>{{ notebook.customerImageName }}</mat-card-content> 
             <mat-card-actions> 
               <button mat-raised-button [disabled]="!formCtrl.valid || blockSubmit" color="primary" (click)="onCreateNotebook(notebook.jsonStr)">Launch</button> 
-              <button mat-button color="accent"></button> 
+              <button mat-raised-button *ngIf="isTeached" color="accent" (click)="onEdit(notebook)">Edit</button> 
             </mat-card-actions> 
-            <mat-card-footer>{{ notebook.shortImageVersion }}</mat-card-footer> 
+            <mat-card-footer>{{ notebook.customerImageVersion }}</mat-card-footer> 
           </mat-card>          
         </mat-grid-tile>
       </ng-container>
