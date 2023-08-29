@@ -19,6 +19,7 @@ import {
   defaultConfig,
   getDeleteDialogConfig,
   getStopDialogConfig,
+  getDisableTemplateDialogConfig,
 } from './config';
 import { isEqual } from 'lodash';
 import { NotebookResponseObject, NotebookProcessedObject } from 'src/app/types';
@@ -185,7 +186,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   }
 
   public disableTemplateNotebook(notebook: NotebookProcessedObject) {
-    const stopDialogConfig = getStopDialogConfig(notebook.name);
+    const stopDialogConfig = getDisableTemplateDialogConfig(notebook.name);
     const ref = this.confirmDialog.open(notebook.name, stopDialogConfig);
     const stopSub = ref.componentInstance.applying$.subscribe(applying => {
       if (!applying) {

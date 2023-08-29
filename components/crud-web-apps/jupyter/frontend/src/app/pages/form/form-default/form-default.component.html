@@ -21,12 +21,13 @@
     <mat-grid-list cols="6" rowHeight="300px">
       <ng-container *ngFor="let notebook of processedData">
         <mat-grid-tile *ngIf="notebook.isTemplate==='yes'" >
-          <mat-card class="post-tile"> 
+          <mat-card class="post-tile">
+            <mat-card-title>{{ notebook.customerCourseName }}</mat-card-title>
             <mat-card-header>
-              <mat-card-title>{{ notebook.customerCourseName }}</mat-card-title>
-              <mat-card-subtitle>{{ notebook.age }}</mat-card-subtitle>
+              <mat-card-subtitle>{{ notebook.name }}</mat-card-subtitle>
               <img mat-card-avatar src="https://picsum.photos/300/300/?random" />
             </mat-card-header>
+            <br />
             <mat-card-content>{{ notebook.customerImageName }}</mat-card-content> 
             <mat-card-actions> 
               <button mat-raised-button [disabled]="!formCtrl.valid || blockSubmit" color="primary" (click)="onCreateNotebook(notebook.jsonStr)">Launch</button> 

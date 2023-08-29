@@ -42,6 +42,20 @@ export function getStopDialogConfig(name: string): DialogConfig {
   };
 }
 
+export function getDisableTemplateDialogConfig(name: string): DialogConfig {
+  return {
+    title: $localize`Are you sure you want to disable this notebook ${name} as template?`,
+    message: $localize`Warning: The notebook will be invisible after 
+                       entering new notebook.`,
+    accept: $localize`DISABLE`,
+    confirmColor: 'primary',
+    cancel: $localize`CANCEL`,
+    error: '',
+    applying: $localize`DISABLING`,
+    width: '600px',
+  };
+}
+
 // --- Config for the Resource Table ---
 export const defaultAdvancedConfig: TableConfig = {
   columns: [
