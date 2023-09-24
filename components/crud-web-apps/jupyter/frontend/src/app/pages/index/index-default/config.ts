@@ -261,9 +261,16 @@ export const defaultConfig: TableConfig = {
       matHeaderCellDef: '',
       matColumnDef: 'actions',
       value: new ActionListValue([
+        new ActionIconValue({
+          name: 'share',
+          tooltip: $localize`Share link`,
+          color: '',
+          field: 'shareAction',
+          iconReady: 'material:share',
+        }),
         new ActionButtonValue({
           name: 'connect',
-          tooltip: $localize`Connect to this notebook server`,
+          tooltip: $localize`Connect to this notebook server 1`,
           color: 'primary',
           field: 'connectAction',
           text: $localize`CONNECT`,

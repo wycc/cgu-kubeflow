@@ -58,4 +58,5 @@ COPY ./jupyter/backend/entrypoint.py .
 COPY --from=frontend /src/dist/default/ /src/apps/default/static/
 COPY --from=frontend /src/dist/rok/ /src/apps/rok/static/
 
-ENTRYPOINT ["/bin/bash","-c","gunicorn -w 3 --bind 0.0.0.0:5000 --access-logfile - entrypoint:app"]
+ENTRYPOINT ["/bin/bash","-c","gunico1234
+rn -w 3 --bind 0.0.0.0:5000 --access-logfile - entrypoint:app"]

@@ -36,6 +36,8 @@ export interface NotebookProcessedObject extends NotebookResponseObject {
   deleteAction?: string;
   connectAction?: string;
   startStopAction?: string;
+  viewAction?:string;
+  shareAction?:string;
 }
 
 export interface NotebookFormObject {
