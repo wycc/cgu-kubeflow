@@ -7,7 +7,8 @@ python3 -mvenv cgu
 
 # install sshscript
 ```
-pip3 install https://github.com/iapyeh/sshscript.git
+git clone https://github.com/iapyeh/sshscript.git
+pip3 install sshscript
 ```
 
 # change the password
