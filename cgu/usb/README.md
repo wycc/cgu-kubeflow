@@ -9,7 +9,7 @@ https://microk8s.io/docs/getting-started
 # Instakll kubeflow
 https://charmed-kubeflow.io/docs/get-started-with-charmed-kubeflow
 
-Please install the 1.6.1 version
+Please install the 1.6 version
 
 
 # Install CGU kubeflow
