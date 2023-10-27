@@ -6,7 +6,7 @@ session = SSHScriptSession()
 # Please make sure the a collect SSH key has been installed in the server or the login
 # information is collect in the beloow line before you execute the script.
 
-with $.connect('root@120.126.23.245','password',port=2222):
+with $.connect('user@host','password',port=2222):
     $kubectl describe nodes
     cur_name=''
     cur_mode = ''
