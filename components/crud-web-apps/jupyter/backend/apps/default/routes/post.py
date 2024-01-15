@@ -2,7 +2,7 @@ from flask import request
 
 from kubeflow.kubeflow.crud_backend import api, decorators, helpers, logging
 
-from ...common import form, utils, volumes
+from ...common import form, utils, volumes, clone_notebook
 from . import bp
 
 import json
@@ -79,3 +79,8 @@ def post_pvc(namespace):
     api.create_notebook(notebook, namespace)
 
     return api.success_response("message", "Notebook created successfully.")
+
+@bp.route("/api/namespaces/clone_pvc/<namespace>/<oldpvcname>/<target_namespace>/<newpvcname>", methods=["GET"])
+def clone_pvc(namespace,oldpvcname,target_namespace,newpvcname):
+    clone_notebook.CloneNotebook().clone_pvc(namespace, oldpvcname, target_namespace, newpvcname,clone=True)
+    return api.success_response("message", "PVC is cloned successfully.")
