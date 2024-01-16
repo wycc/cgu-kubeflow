@@ -1,6 +1,6 @@
 from kubernetes import client, config
 import yaml
-import time
+import time,os
 import traceback
 
 # Load the Kubernetes configuration
@@ -23,10 +23,21 @@ sidecar container can copy the home directory from the source notebook to the ta
 We can customize the behaviour of the clone container which is specified in the sample_notebook.yaml. We will put this in a configmap so that
 the user can customize the behaviour of the clone container.
 """
+FILE_ABS_PATH = os.path.abspath(os.path.dirname(__file__))
 
-SAMPLE_NOTEBOOK = "sample_notebook.yaml"
-SAMPLE_PVC = "sample_pvc.yaml"
-SAMPLE_PV = "sample_pv.yaml"
+NOTEBOOK_TEMPLATE_YAML = os.path.join(
+    FILE_ABS_PATH, "yaml/notebook_template.yaml"
+)
+
+SAMPLE_NOTEBOOK = os.path.join(
+    FILE_ABS_PATH, "yaml/sample_notebook.yaml"
+)
+SAMPLE_PVC = os.path.join(
+    FILE_ABS_PATH, "yaml/sample_pvc.yaml"
+)
+SAMPLE_PV = os.path.join(
+    FILE_ABS_PATH, "yaml/sample_pv.yaml"
+)
 
 class CloneNotebook:
   def __init__(self):
