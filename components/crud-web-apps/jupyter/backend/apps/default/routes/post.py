@@ -94,12 +94,15 @@ def post_pvc(namespace):
 
         v1_volume = volumes.get_pod_volume(api_volume, pvc)
         mount = volumes.get_container_mount(api_volume, v1_volume["name"])
-
+        
         notebook = volumes.add_notebook_volume(notebook, v1_volume)
-        notebook = volumes.add_notebook_container_mount(notebook, mount)
-        # If the template is used, we add the to the clone container
-        if template != None:
-          notebook = volumes.add_notebook_container_source_mount(notebook, mount)
+        print("lancemount",mount)
+        print("lancenewpvcname",newpvcname)
+        if mount["name"] != newpvcname:
+            notebook = volumes.add_notebook_container_mount(notebook, mount)
+            # If the template is used, we add the to the clone container
+            if template != None:
+                notebook = volumes.add_notebook_container_source_mount(notebook, mount)
 
     log.info("Creating Notebook: %s", notebook)
     api.create_notebook(notebook, namespace)
