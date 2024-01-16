@@ -30,7 +30,7 @@
             <br />
             <mat-card-content>{{ notebook.customerImageName }}</mat-card-content> 
             <mat-card-actions> 
-              <button mat-raised-button [disabled]="!formCtrl.valid || blockSubmit" color="primary" (click)="onCreateNotebook(notebook.jsonStr)">Launch</button> 
+              <button mat-raised-button [disabled]="!formCtrl.valid || blockSubmit" color="primary" (click)="onCreateNotebook( notebook.jsonStr)">Launch</button> 
               <button mat-raised-button *ngIf="isTeached" color="accent" (click)="onEdit(notebook)">Edit</button> 
             </mat-card-actions> 
             <mat-card-footer>{{ notebook.customerImageVersion }}</mat-card-footer> 

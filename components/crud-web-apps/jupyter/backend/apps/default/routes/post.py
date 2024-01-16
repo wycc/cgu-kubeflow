@@ -50,7 +50,7 @@ def post_pvc(namespace):
       )
 
     defaults = utils.load_spawner_ui_config()
-
+    print("notebook",notebook)
     form.set_notebook_image(notebook, body, defaults)
     form.set_notebook_image_pull_policy(notebook, body, defaults)
     form.set_server_type(notebook, body, defaults)
