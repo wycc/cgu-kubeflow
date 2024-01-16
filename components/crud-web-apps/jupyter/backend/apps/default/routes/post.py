@@ -20,15 +20,34 @@ def post_pvc(namespace):
     # Convert dict to string
     data = json.dumps(body)
     log.info("Got data: %s" % data)
-    
-    notebook = helpers.load_param_yaml(
-        utils.NOTEBOOK_TEMPLATE_YAML,
-        name=body["name"],
-        namespace=namespace,
-        isTemplate =  '\"'+body["isTemplate"]+'\"',
-        serviceAccount="default-editor",
-        jsonStr = '\'' + data + '\'',
-    )
+
+    # If template is defined, clone the PVC from the template and then add the /source 
+    # to the volumes and volumeMount.
+    template = body["template"]
+    newpvcname=None
+    if template == None:
+      notebook = helpers.load_param_yaml(
+          utils.NOTEBOOK_TEMPLATE_YAML,
+          name=body["name"],
+          namespace=namespace,
+          isTemplate =  '\"'+body["isTemplate"]+'\"',
+          serviceAccount="default-editor",
+          jsonStr = '\'' + data + '\'',
+      )
+    else:
+      origin_namespace = body['origin_namespace']
+      oldpvcname = template
+      newpvcname = body["name"]+'-source-volume'
+      clone_notebook.CloneNotebook().clone_pvc(origin_namespace, oldpvcname, namespace, newpvcname,clone=True)
+      notebook = helpers.load_param_yaml(
+          utils.NOTEBOOK_TEMPLATE_CLONE_YAML,
+          name=body["name"],
+          namespace=namespace,
+          isTemplate =  '\"'+body["isTemplate"]+'\"',
+          serviceAccount="default-editor",
+          templatePvcName = '\"'+newpvcname+'\"',
+          jsonStr = '\'' + data + '\'',
+      )
 
     defaults = utils.load_spawner_ui_config()
 
@@ -52,6 +71,10 @@ def post_pvc(namespace):
     if workspace:
         api_volumes.append(workspace)
 
+    # add source volume from the template
+    if newpvcname:
+        api_volumes.append({"mount":'/source',"existingSource": {"persistentVolumeClaim":{"claimName":newpvcname}}})
+
     log.info("Creating Notebook: %s", notebook)
     # ensure that all objects can be created
     api.create_notebook(notebook, namespace, dry_run=True)
@@ -74,6 +97,9 @@ def post_pvc(namespace):
 
         notebook = volumes.add_notebook_volume(notebook, v1_volume)
         notebook = volumes.add_notebook_container_mount(notebook, mount)
+        # If the template is used, we add the to the clone container
+        if template != None:
+          notebook = volumes.add_notebook_container_source_mount(notebook, mount)
 
     log.info("Creating Notebook: %s", notebook)
     api.create_notebook(notebook, namespace)

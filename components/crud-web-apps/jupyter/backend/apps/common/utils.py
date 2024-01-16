@@ -16,6 +16,9 @@ FILE_ABS_PATH = os.path.abspath(os.path.dirname(__file__))
 NOTEBOOK_TEMPLATE_YAML = os.path.join(
     FILE_ABS_PATH, "yaml/notebook_template.yaml"
 )
+NOTEBOOK_TEMPLATE_CLONEYAML = os.path.join(
+    FILE_ABS_PATH, "yaml/notebook_template_clone.yaml"
+)
 LAST_ACTIVITY_ANNOTATION = "notebooks.kubeflow.org/last-activity"
 
 # The production configuration is mounted on the app's pod via a configmap
