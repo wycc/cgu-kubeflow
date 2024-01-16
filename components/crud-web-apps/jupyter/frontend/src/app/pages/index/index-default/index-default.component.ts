@@ -128,6 +128,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     window.open(`/notebook/${notebook.namespace}/${notebook.name}/view`);
   }
   public shareClicked(notebook: NotebookProcessedObject) {
+    /*
     if (notebook.status.phase === STATUS_TYPE.READY) {
       this.actions.connectToNotebookDetail(notebook.namespace, notebook.name);
     } else {
@@ -140,6 +141,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         this.actions.connectToNotebookDetail(notebook.namespace, notebook.name);
       });
     }
+    */
   }
   
   // Event handling functions
