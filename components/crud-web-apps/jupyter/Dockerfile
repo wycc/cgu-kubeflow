@@ -52,11 +52,14 @@ WORKDIR /src
 COPY ./jupyter/backend/requirements.txt .
 RUN pip3 install -r requirements.txt
 
+# --- Install debug package ---
+RUN apt-get update && apt-get install -y procps
+RUN apt-get install -y vim
+
 COPY ./jupyter/backend/apps/ ./apps
 COPY ./jupyter/backend/entrypoint.py .
 
 COPY --from=frontend /src/dist/default/ /src/apps/default/static/
 COPY --from=frontend /src/dist/rok/ /src/apps/rok/static/
 
-ENTRYPOINT ["/bin/bash","-c","gunico1234
-rn -w 3 --bind 0.0.0.0:5000 --access-logfile - entrypoint:app"]
+ENTRYPOINT ["/bin/bash","-c","while :; do gunicorn -w 3 --bind 0.0.0.0:5000 --access-logfile - entrypoint:app; done"]
