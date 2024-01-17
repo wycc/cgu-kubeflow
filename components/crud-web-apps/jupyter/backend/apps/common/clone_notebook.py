@@ -2,11 +2,15 @@ from kubernetes import client, config
 import yaml
 import time,os
 import traceback
-
+from kubernetes.config.config_exception import ConfigException
 # Load the Kubernetes configuration
 # Create API endpoints for the core API and custom object API
 
-config.load_kube_config()
+try:
+    config.load_incluster_config()
+except ConfigException:
+    config.load_kube_config()
+
 core_api = client.CoreV1Api()
 custom_object_api = client.CustomObjectsApi()
 
