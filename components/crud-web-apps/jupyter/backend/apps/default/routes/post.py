@@ -23,7 +23,10 @@ def post_pvc(namespace):
 
     # If template is defined, clone the PVC from the template and then add the /source 
     # to the volumes and volumeMount.
-    template = body["template"]
+    try:
+        template = body["template"]
+    except:
+        template = None
     newpvcname=None
     if template == None:
       notebook = helpers.load_param_yaml(

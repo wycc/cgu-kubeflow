@@ -88,9 +88,12 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       else
         this.isBasic = true;
 
+      this.isBasic = false;  
       // alert(username.substring(0,1));
       //console.log("username", username)
     });
+
+    // this.isBasic = false;
 
     // Poll for new data and reset the poller if different data is found
     this.subs.add(
