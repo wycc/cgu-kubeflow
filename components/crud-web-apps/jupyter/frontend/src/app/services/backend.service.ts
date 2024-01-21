@@ -11,6 +11,7 @@ import {
   NotebookFormObject,
   NotebookProcessedObject,
   PvcResponseObject,
+  AuthorizationPolicyResponseObject
 } from '../types';
 @Injectable({
   providedIn: 'root',
@@ -44,7 +45,21 @@ export class JWABackendService extends BackendService {
       }),
     );
   }
+  
+// 2024/01/21 YCL authorizationPolicy start//
+public getAllAuthorizationPolicy(namespace): Observable<AuthorizationPolicyResponseObject[]> {
+    const url = `api/namespaces/${namespace}/aps`;
 
+    return this.http.get<JWABackendResponse>(url).pipe(
+      catchError(error => this.handleError(error)),
+      map((resp: JWABackendResponse) => {
+        console.log('xxxxxx');
+        return resp.authorizationpolicy;
+      }),
+    );
+  }
+// 2024/01/21 YCL authorizationPolicy end//
+  
   public getConfig(): Observable<Config> {
     const url = `api/config`;
 
@@ -173,7 +188,23 @@ export class JWABackendService extends BackendService {
       }),
     );
   }
-
+  //2024/01/21 YCL createauthorizationpolicy start//
+  public createAuthorization(namespace,nameValue,pathValue,userEmail): Observable<string> {
+    const url2 = `api/namespaces/${namespace}/aps_vnc`;
+  
+    // Create an object with the 'name' parameter
+    const requestBody = { name: nameValue, paths: pathValue, useremail: userEmail};
+    
+    return this.http.post<JWABackendResponse>(url2,requestBody).pipe(
+      catchError(_ => {
+        return 'error';
+      }),
+      map(_ => {
+        return 'posted';
+      }),
+    );
+  }
+    //2024/01/21 YCL createauthorizationpolicy end//
   // DELETE
   public deleteNotebook(namespace: string, name: string) {
     const url = `api/namespaces/${namespace}/notebooks/${name}`;
