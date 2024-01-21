@@ -19,6 +19,31 @@ def create_notebook(notebook, namespace, dry_run=False):
     return custom_api.create_namespaced_custom_object(
         "kubeflow.org", "v1beta1", namespace, "notebooks", notebook,
         dry_run="All" if dry_run else None)
+    
+#YCL Create authorization policy start #
+def create_authorization(authorization,namespace,dry_run=False):
+    authz.ensure_authorized(
+        "create", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    )
+    print(authorization)
+    return custom_api.create_namespaced_custom_object(
+        "security.istio.io", "v1beta1", namespace, "authorizationpolicies",authorization,
+        dry_run="All" if dry_run else None)
+#YCL Create authorization policy end #  
+
+#2024/01/20 YCL Delete authorization policy start#
+def delete_authorization(name,namespace):
+    authz.ensure_authorized(
+        "delete", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    )
+    return custom_api.delete_namespaced_custom_object(
+        group="security.istio.io",
+        version="v1beta1",
+        namespace=namespace,
+        plural="authorizationpolicies",
+        name=name
+    ) 
+#2024/01/20 YCL Delete authorization policy end#
 
 
 def list_notebooks(namespace):
@@ -28,6 +53,16 @@ def list_notebooks(namespace):
     return custom_api.list_namespaced_custom_object(
         "kubeflow.org", "v1beta1", namespace, "notebooks"
     )
+    
+// List all authorizationpolicy start//    
+def list_all_authorizationpolicy(namespace):
+    authz.ensure_authorized(
+        "list", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    )
+    return custom_api.list_namespaced_custom_object(
+        "security.istio.io", "v1beta1", namespace, "authorizationpolicies"
+    )
+// List all authorizationpolicy end//  
 
 def list_all_notebooks(namespace):
     authz.ensure_authorized(
