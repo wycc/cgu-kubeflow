@@ -54,7 +54,7 @@ def list_notebooks(namespace):
         "kubeflow.org", "v1beta1", namespace, "notebooks"
     )
     
-// List all authorizationpolicy start//    
+# List all authorizationpolicy start//    
 def list_all_authorizationpolicy(namespace):
     authz.ensure_authorized(
         "list", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
@@ -62,7 +62,7 @@ def list_all_authorizationpolicy(namespace):
     return custom_api.list_namespaced_custom_object(
         "security.istio.io", "v1beta1", namespace, "authorizationpolicies"
     )
-// List all authorizationpolicy end//  
+# List all authorizationpolicy end
 
 def list_all_notebooks(namespace):
     authz.ensure_authorized(
