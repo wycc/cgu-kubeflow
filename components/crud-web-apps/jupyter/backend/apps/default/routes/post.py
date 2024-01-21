@@ -110,3 +110,27 @@ def post_pvc(namespace):
 def clone_pvc(namespace,oldpvcname,target_namespace,newpvcname):
     clone_notebook.CloneNotebook().clone_pvc(namespace, oldpvcname, target_namespace, newpvcname,clone=True)
     return api.success_response("message", "PVC is cloned successfully.")
+
+#YCL creat authorization policy for /view start
+@bp.route("/api/namespaces/<namespace>/aps_vnc", methods=["POST"])
+@decorators.request_is_json_type
+@decorators.required_body_params("name")
+
+def post_pvc1(namespace):
+    body = request.get_json()
+    log.info("Got body: %s" % body)
+   
+    authorization = helpers.load_param_yaml(
+        utils.AUTHORIZATIONPOLICY_TEMPLATE_YAML,
+        name=body["name"],
+        namespace=namespace,
+        paths=body["paths"],
+        useremail = body["useremail"]
+    )
+
+    #log.info("Creating AuthorizationPolicy for view...: %s",  authorization)
+    api.create_authorization(authorization,namespace)
+
+    return api.success_response("message", "File created successfully.")
+#YCL creat authorization policy for /view end
+
