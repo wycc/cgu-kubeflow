@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    .view-chip-list-container {
+  border: 1px solid #ccc; 
+  padding: 10px; 
+  border-radius: 5px; }
+  </style>
+</head>
+<h2 mat-dialog-title style="text-align: center;">
+  分享 Notebook : {{notebook}}
+</h2>
+<mat-divider></mat-divider>
+<!----------------------------------20231217 chip in email start-------------------------------------------->
+<p style="color:#0b5299">1. 新增使用者:</p> 
+<mat-form-field class="example-chip-list" style="width: 515px;">
+  <mat-chip-list #chipList>
+    <mat-chip *ngFor="let useremail of useremail" [selectable]="selectable"
+             [removable]="removable" (removed)="remove(useremail)">
+      {{useremail.name}}
+      <mat-icon matChipRemove *ngIf="removable">cancel</mat-icon>
+    </mat-chip>
+    <input matInput placeholder="請輸入Email" 
+           [matChipInputFor]="chipList"
+           [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+           [matChipInputAddOnBlur]="addOnBlur"
+           (matChipInputTokenEnd)="add($event)">
+
+  </mat-chip-list>
+</mat-form-field>
+<!----------------------------------20231217 chip in email end-------------------------------------------->
+
+<!----------------------------------20231217 mode selection in email start-------------------------------------------->
+<p style="color:#0b5299;margin-top:3%">2. 選擇存取權:</p> 
+<mat-form-field style="width: 515px;">
+  <mat-label>存取權 :</mat-label>
+  <mat-select [(value)]="selected" (selectionChange)="updateCopyLink()">
+    <mat-option value="option1">僅檢視 (View Only)</mat-option>
+    <mat-option value="option2">可修改 (Editable)</mat-option>
+  </mat-select>
+</mat-form-field>
+<br>
+<div mat-dialog-actions align="center" style="margin-top:3%;margin-bottom: 4%;"> 
+  <button mat-raised-button color="warn"  [cdkCopyToClipboard]="copylink"> Copy Link </button>
+  <button mat-raised-button color="primary" style="margin-left:10%;" (click)="onSubmit()">加入 </button>
+  <button mat-raised-button color="primary" (click)="cancel()" style="margin-left:10%;" (click)="delete()">取消所有分享 </button>
+</div>
+<!----------------------------------20231217 mode selection in email end-------------------------------------------->
+
+<!----------------------------------20240109 extension panel start-------------------------------------------->
+<mat-accordion>
+<mat-expansion-panel (opened)="panelOpenState = true"
+                     (closed)="panelOpenState = false">
+    <mat-expansion-panel-header>
+      <mat-panel-title style="color:#0b5299">
+        查看現有分享清單
+      </mat-panel-title>
+    </mat-expansion-panel-header>
+    <div class="view-chip-list-container">
+      <mat-form-field class="view-chip-list" style="width: 450px;">
+        <mat-label style=" font-size: 16px;">View Only</mat-label> 
+        <mat-chip-list #chipList>
+          <mat-chip
+            *ngFor="let viewlist of viewlist"
+            [selectable]="selectable"
+            [removable]="removable"
+            (removed)="remove1(viewlist)">
+            {{viewlist}}
+            <mat-icon matChipRemove *ngIf="removable">cancel</mat-icon>
+          </mat-chip>
+        </mat-chip-list>
+      </mat-form-field>
+      <br>
+      <mat-form-field class="view-chip-list" style="width: 450px;">
+        <mat-label style=" font-size: 16px;">Editable</mat-label> 
+        <mat-chip-list #chipList>
+          <mat-chip
+            *ngFor="let editlist of editlist"
+            [selectable]="selectable"
+            [removable]="removable"
+            (removed)="remove2(editlist)">
+           
+            {{editlist}}
+            <mat-icon matChipRemove *ngIf="removable" >cancel</mat-icon>
+          </mat-chip>
+        </mat-chip-list>
+      </mat-form-field>
+    </div>
+  </mat-expansion-panel>
+</mat-accordion>
+<!----------------------------------20240109 extension panel end-------------------------------------------->
