@@ -1,4 +1,3 @@
-//2024/01/21 YCL create//
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon'; 
@@ -30,4 +29,3 @@ import {MatExpansionModule} from '@angular/material/expansion';
   ],
 })
 export class DialogSharingModule { }
-//2024/01/21 YCL create//
