@@ -20,7 +20,7 @@ def create_notebook(notebook, namespace, dry_run=False):
         "kubeflow.org", "v1beta1", namespace, "notebooks", notebook,
         dry_run="All" if dry_run else None)
     
-#YCL Create authorization policy start #
+#Create authorization policy start #
 def create_authorization(authorization,namespace,dry_run=False):
     authz.ensure_authorized(
         "create", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
@@ -29,9 +29,9 @@ def create_authorization(authorization,namespace,dry_run=False):
     return custom_api.create_namespaced_custom_object(
         "security.istio.io", "v1beta1", namespace, "authorizationpolicies",authorization,
         dry_run="All" if dry_run else None)
-#YCL Create authorization policy end #  
+#Create authorization policy end #  
 
-#2024/01/20 YCL Delete authorization policy start#
+#2024/01/20 Delete authorization policy start#
 def delete_authorization(name,namespace):
     authz.ensure_authorized(
         "delete", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
@@ -43,7 +43,29 @@ def delete_authorization(name,namespace):
         plural="authorizationpolicies",
         name=name
     ) 
-#2024/01/20 YCL Delete authorization policy end#
+#2024/01/20 Delete authorization policy end#
+
+#2024/01/23 Modify authorization policy start#
+def modify_authorization(namespace, name,body):
+    authz.ensure_authorized(
+        "patch", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    )
+
+    return custom_api.patch_namespaced_custom_object(
+        "security.istio.io", "v1beta1", namespace, "authorizationpolicies", name, body
+    )
+#2024/01/23 Modify authorization policy end#
+
+#2024/01/23 Modify authorization policy start#
+def modify_authorization_delete(namespace, name,body):
+    authz.ensure_authorized(
+        "patch", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    )
+
+    return custom_api.patch_namespaced_custom_object(
+        "security.istio.io", "v1beta1", namespace, "authorizationpolicies", name, body
+    )
+#2024/01/23 Modify authorization policy end#
 
 
 def list_notebooks(namespace):
