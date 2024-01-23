@@ -4,10 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    .view-chip-list-container {
-  border: 1px solid #ccc; 
-  padding: 10px; 
-  border-radius: 5px; }
+  .view-chip-list-container {
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  padding: 10px;
+  border-radius: 5px;
+}
   </style>
 </head>
 <h2 mat-dialog-title style="text-align: center;">
@@ -16,7 +18,7 @@
 <mat-divider></mat-divider>
 <!----------------------------------20231217 chip in email start-------------------------------------------->
 <p style="color:#0b5299">1. 新增使用者:</p> 
-<mat-form-field class="example-chip-list" style="width: 515px;">
+<mat-form-field class="example-chip-list" style="width: 530px;">
   <mat-chip-list #chipList>
     <mat-chip *ngFor="let useremail of useremail" [selectable]="selectable"
              [removable]="removable" (removed)="remove(useremail)">
@@ -35,9 +37,9 @@
 
 <!----------------------------------20231217 mode selection in email start-------------------------------------------->
 <p style="color:#0b5299;margin-top:3%">2. 選擇存取權:</p> 
-<mat-form-field style="width: 515px;">
+<mat-form-field style="width: 530px;">
   <mat-label>存取權 :</mat-label>
-  <mat-select [(value)]="selected" (selectionChange)="updateCopyLink()">
+  <mat-select [(value)]="selected" (selectionChange)="updateCopyLink()" >
     <mat-option value="option1">僅檢視 (View Only)</mat-option>
     <mat-option value="option2">可修改 (Editable)</mat-option>
   </mat-select>
@@ -60,8 +62,9 @@
       </mat-panel-title>
     </mat-expansion-panel-header>
     <div class="view-chip-list-container">
-      <mat-form-field class="view-chip-list" style="width: 450px;">
-        <mat-label style=" font-size: 16px;">View Only</mat-label> 
+      <ng-container *ngIf="viewlist && viewlist.length > 0; else viewOnlyNoData">
+      <mat-form-field class="view-chip-list" style="width: 470px;">
+        <mat-label style=" font-size: 16px;">僅檢視(View Only)</mat-label> 
         <mat-chip-list #chipList>
           <mat-chip
             *ngFor="let viewlist of viewlist"
@@ -74,8 +77,15 @@
         </mat-chip-list>
       </mat-form-field>
       <br>
-      <mat-form-field class="view-chip-list" style="width: 450px;">
-        <mat-label style=" font-size: 16px;">Editable</mat-label> 
+    </ng-container>
+    
+      <ng-template #viewOnlyNoData>
+        <p style="margin-top: 10px;text-align: center;font-size: 14px;">僅檢視(View Only)目前未有任何分享</p>
+      </ng-template>
+      <br>
+    <ng-container *ngIf="editlist && editlist.length > 0; else noData">
+      <mat-form-field class="edit-chip-list" style="width: 470px; ">
+        <mat-label style=" font-size: 16px;">可修改(Editable)</mat-label> 
         <mat-chip-list #chipList>
           <mat-chip
             *ngFor="let editlist of editlist"
@@ -88,6 +98,12 @@
           </mat-chip>
         </mat-chip-list>
       </mat-form-field>
+    </ng-container>
+  
+
+  <ng-template #noData>
+    <p style="margin-top: 10px;text-align: center;font-size: 14px;">可修改(Editable)目前未有任何分享</p>
+  </ng-template>
     </div>
   </mat-expansion-panel>
 </mat-accordion>
