@@ -126,23 +126,6 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     this.subs.unsubscribe();
     this.poller.stop();
   }
-  public viewClicked(notebook: NotebookProcessedObject) {
-    window.open(`/notebook/${notebook.namespace}/${notebook.name}/view`);
-  }
-  public shareClicked(notebook: NotebookProcessedObject) {
-    if (notebook.status.phase === STATUS_TYPE.READY) {
-      this.actions.connectToNotebookDetail(notebook.namespace, notebook.name);
-    } else {
-      this.actions
-      .startNotebook(notebook.namespace, notebook.name)
-      .subscribe(_ => {
-        notebook.status.phase = STATUS_TYPE.WAITING;
-        notebook.status.message = 'Starting the Notebook Server.';
-        this.updateNotebookFields(notebook);
-        this.actions.connectToNotebookDetail(notebook.namespace, notebook.name);
-      });
-    }
-  }
   
   // Event handling functions
   reactToAction(a: ActionEvent) {
@@ -212,9 +195,22 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
                console.error('Error creating authorization policy:', error);
              });
             }else {
-              console.log('filteredName != 0, existed');
+              //2024/01/23 新增email功能 start
+              this.backend.modify_authorizaiton(this.currNamespace,namevalue,useremail).subscribe(
+                (response) => {
+                 console.log("Success for adding");
+                 console.log('currNamespace:', this.currNamespace);
+                 console.log('namevalue:', namevalue);
+                 console.log("useremail:", useremail);
+                 console.log("selected-option:", selected);
+                },
+                (error) => {
+                  console.log('filteredName != 0, existed');
+               });
+           
             }
           });
+          //2024/01/23 新增email功能 end
          }else{
           // if select "editable" //
           const paths = `/notebook/${a.data.namespace}/${a.data.name}/*`;
@@ -238,12 +234,24 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
               console.error('Error creating authorization policy:', error);
             });
           }else {
-            console.log('filteredName != 0, existed');
+            //2024/01/23 新增email功能 start
+            this.backend.modify_authorizaiton(this.currNamespace,namevalue,useremail).subscribe(
+              (response) => {
+               console.log("Success for adding");
+               console.log('currNamespace:', this.currNamespace);
+               console.log('namevalue:', namevalue);
+               console.log("useremail:", useremail);
+               console.log("selected-option:", selected);
+              },
+              (error) => {
+                console.log('filteredName != 0, existed');
+             });
           }
         })};
+        //2024/01/23 新增email功能 end
       }
     });
-    // 2024/1/16 YCL end //
+    // 2024/1/16 YC end //
   break;
     }}
 
