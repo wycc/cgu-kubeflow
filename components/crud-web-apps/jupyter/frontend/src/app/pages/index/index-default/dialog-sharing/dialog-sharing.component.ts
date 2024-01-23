@@ -1,4 +1,3 @@
-// 2024/01/21 YCL create //
 import { Component, OnInit, Inject } from '@angular/core';
 import {COMMA, ENTER} from '@angular/cdk/keycodes';
 import {MatChipInputEvent} from '@angular/material/chips';
@@ -116,8 +115,15 @@ export class DialogSharing implements OnInit {
   myString:string;
   onSubmit() {
      this.useremailNames = this.useremail.map(email => email.name);
-     this.dialogRef.close({ useremail: this.useremailNames, selected: this.selected });
+     if (this.useremailNames.length === 0 || !this.selected) {
+      window.alert('請填寫email或存取權');
+      console.log('請添加至少一個 Email 或選擇存取權限。');
+    } else {
+      // 至少有一個不為空，執行相應的邏輯
+      this.dialogRef.close({ useremail: this.useremailNames, selected: this.selected });
+    }
   }
+     
   //2024/01/20 可添加多個email功能完成 end//
 
  // CopyLink 選項 串連notebook的name和namespace start//
@@ -143,7 +149,21 @@ export class DialogSharing implements OnInit {
     const index1 = this.viewlist.indexOf(viewlist);
     if (index1 >= 0) {
       this.viewlist.splice(index1, 1);
-    }
+      console.log("########");
+      console.log([viewlist]);
+      const address = `notebook-${this.notebook}-authorizationpolicy-view`;
+      this.backend.modify_authorizaiton_delete(this.namespace, address, [viewlist])
+      .subscribe(
+        response => {
+          console.log("########");
+          console.log([viewlist]);
+          console.log("Authorization modified successfully:", response);
+        },
+        error => {
+          console.error("Error modifying authorization:", error);
+        }
+      );
+  }
   }
   // 2024/01/16 Expansion panel for view end //
 
@@ -152,7 +172,21 @@ export class DialogSharing implements OnInit {
     const index2 = this.editlist.indexOf(editlist);
     if (index2 >= 0) {
       this.editlist.splice(index2, 1);
-    }
+      console.log("########");
+      console.log([editlist]);
+      const address = `notebook-${this.notebook}-authorizationpolicy-editable`;
+      this.backend.modify_authorizaiton_delete(this.namespace, address, [editlist])
+      .subscribe(
+        response => {
+          console.log("########");
+          console.log([editlist]);
+          console.log("Authorization modified successfully:", response);
+        },
+        error => {
+          console.error("Error modifying authorization:", error);
+        }
+      );
+  }
   }
   // 2024/01/16 Expansion panel for edit end //
 
@@ -187,4 +221,3 @@ export class DialogSharing implements OnInit {
  }
   // 2024/01/20 取消所有分享function end //
 }
-// 2024/01/21 YCL create //
