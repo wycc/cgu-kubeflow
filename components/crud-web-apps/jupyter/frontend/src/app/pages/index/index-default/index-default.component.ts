@@ -93,8 +93,6 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       //console.log("username", username)
     });
 
-    // this.isBasic = false;
-
     // Poll for new data and reset the poller if different data is found
     this.subs.add(
       this.poller.start().subscribe(() => {
