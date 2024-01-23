@@ -188,6 +188,7 @@ public getAllAuthorizationPolicy(namespace): Observable<AuthorizationPolicyRespo
       }),
     );
   }
+  
   //2024/01/21 YCL createauthorizationpolicy start//
   public createAuthorization(namespace,nameValue,pathValue,userEmail): Observable<string> {
     const url2 = `api/namespaces/${namespace}/aps_vnc`;
@@ -204,7 +205,54 @@ public getAllAuthorizationPolicy(namespace): Observable<AuthorizationPolicyRespo
       }),
     );
   }
-    //2024/01/21 YCL createauthorizationpolicy end//
+  //2024/01/21 YCL createauthorizationpolicy end//
+  
+  //2024/01/21 YCL deleteauthorizationpolicy start// 
+  // DELETE
+   public deleteauthorization(delete_name: string, namespace: string) {
+    const url = `api/namespaces/${namespace}/aps_vnc/${delete_name}`;
+    return this.http
+      .delete<JWABackendResponse>(url)
+      .pipe(catchError(error => this.handleError(error, false)));
+  }
+//2024/01/21 YCL deleteauthorizationpolicy end// 
+  
+// 2024/01/23 YCL add data start//
+  public modify_authorizaiton(nameSpace,namevalue,adddata): Observable<string> {
+  const url2 = `api/namespaces/${nameSpace}/aps_vnc/${namevalue}`;
+
+  // Create an object with the 'name' parameter
+  const requestBody = { values_to_add: adddata};
+  
+  return this.http.patch<JWABackendResponse>(url2,requestBody).pipe(
+    catchError(_ => {
+      return 'error';
+    }),
+    map(_ => {
+      return 'posted';
+    }),
+  );
+}
+// 2024/01/23 YCL add data end//
+  
+// 2024/01/23 YCL delete data start//
+public modify_authorizaiton_delete(nameSpace,namevalue,deletedata): Observable<string> {
+  const url2 = `api/namespaces/${nameSpace}/aps_vnc_1/${namevalue}`;
+
+  // Create an object with the 'name' parameter
+  const requestBody = {values_to_delete: deletedata};
+  
+  return this.http.patch<JWABackendResponse>(url2,requestBody).pipe(
+    catchError(_ => {
+      return 'error';
+    }),
+    map(_ => {
+      return 'posted';
+    }),
+  );
+}
+// 2024/01/23 YCL delete data end//
+  
   // DELETE
   public deleteNotebook(namespace: string, name: string) {
     const url = `api/namespaces/${namespace}/notebooks/${name}`;
