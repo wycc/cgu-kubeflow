@@ -4,10 +4,11 @@ from flask import jsonify
 from kubernetes import client
 
 from .. import authn
-
+from . import profile
 
 def success_response(data_field=None, data=None):
     user = authn.get_username()
+    # profile = get_profile(user)
     resp = {"status": 200, "success": True, "user": user}
     if data_field is None and data is None:
         return jsonify(resp)
