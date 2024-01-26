@@ -161,7 +161,7 @@ export const defaultAdvancedConfig: TableConfig = {
         }),
         // 2023/08/29 YCL sharing start //
         new ActionIconValue({
-          name: 'view',
+          name: 'share',
           tooltip: $localize`Share this notebook`,
           color: '',
           field: 'deleteAction',
