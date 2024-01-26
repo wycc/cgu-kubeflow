@@ -8,8 +8,24 @@ from . import profile
 
 def success_response(data_field=None, data=None):
     user = authn.get_username()
-    # profile = get_profile(user)
+
+    # if user is not None:
+    # user3 = "test85"
+    # print("user3: ", user3)
+    #profile_name = profile.get_profile(user)
+    #manager =  "user"
+    #try:
+    #    manager =  profile_name["metadata"]["annotations"]["manager"]
+    #except:
+    #    manager =  "user"
+    
+    #print("Profile3: ", profile_name)
+    #print("profile3: ", manager)
+
     resp = {"status": 200, "success": True, "user": user}
+
+    #print("success_response: ", resp)
+
     if data_field is None and data is None:
         return jsonify(resp)
 

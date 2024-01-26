@@ -11,6 +11,7 @@ import {
   NotebookFormObject,
   NotebookProcessedObject,
   PvcResponseObject,
+  AuthorizationPolicyResponseObject
 } from '../types';
 @Injectable({
   providedIn: 'root',

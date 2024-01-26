@@ -77,6 +77,10 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.poller = new ExponentialBackoff({ interval: 1000, retries: 3 });
 
+    //this.backend.getUsername().subscribe(manager => {
+    //  alert(manager);
+    //});
+
     this.backend.getUsername().subscribe(username => {
       if (Object.keys(username).length === 0) {
         // Don't fire on empty config
@@ -91,7 +95,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         this.isBasic = true;
 
       this.isBasic = false;  
-      // alert(username.substring(0,1));
+      alert(username);
       //console.log("username", username)
     });
 
