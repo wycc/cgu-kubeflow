@@ -22,6 +22,15 @@ export class JWABackendService extends BackendService {
   }
 
   // GET
+  public getManager(namespace: string): Observable<string[]> {
+    const url = `api/manager/${namespace}`;
+
+    return this.http.get<JWABackendResponse>(url).pipe(
+      catchError(error => this.handleError(error)),
+      map(data => data.manager),
+    );
+  }
+
   public getNotebooks(namespace: string): Observable<NotebookResponseObject[]> {
     const url = `api/namespaces/${namespace}/notebooks`;
 

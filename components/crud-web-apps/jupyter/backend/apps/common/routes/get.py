@@ -19,6 +19,22 @@ def get_config():
     config = utils.load_spawner_ui_config()
     return api.success_response("config", config)
 
+@bp.route("/api/manager/<namespace>")
+def get_manager(namespace):
+    print("get_manager: ", namespace)
+    if namespace is None:
+        return "user"
+    profile = api.get_profile2(namespace)
+    manager = "user"
+    if profile is not None:
+        try:
+            manager = profile["metadata"]["annotations"]["manager"]
+        except:
+            manager = "user"
+
+    contents = [manager]
+
+    return api.success_response("manager", contents)
 
 @bp.route("/api/namespaces/<namespace>/pvcs")
 def get_pvcs(namespace):

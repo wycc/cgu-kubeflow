@@ -94,8 +94,8 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       else
         this.isBasic = true;
 
-      this.isBasic = false;  
-      alert(username);
+      //this.isBasic = false;  
+      //alert(username);
       //console.log("username", username)
     });
 
@@ -123,6 +123,14 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       this.ns.getSelectedNamespace().subscribe(ns => {
         this.currNamespace = ns;
         this.poller.reset();
+
+        this.backend.getManager(this.currNamespace).subscribe(manager => {
+            // alert(manager[0]);
+            if( manager[0] === "manager" )
+              this.isBasic = false;
+            else
+              this.isBasic = true;
+        });
       }),
     );
   }
@@ -131,9 +139,11 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     this.subs.unsubscribe();
     this.poller.stop();
   }
+
   public viewClicked(notebook: NotebookProcessedObject) {
     window.open(`/notebook/${notebook.namespace}/${notebook.name}/view`);
   }
+  
   public shareClicked(notebook: NotebookProcessedObject) {
 
   }

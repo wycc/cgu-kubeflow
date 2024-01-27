@@ -12,4 +12,5 @@ export interface JWABackendResponse extends BackendResponse {
   poddefaults?: PodDefault[];
   vendors?: string[];
   authorizationpolicy?: AuthorizationPolicyResponseObject[];
+  manager?:string[];
 }

@@ -24,12 +24,14 @@ def success_response(data_field=None, data=None):
 
     resp = {"status": 200, "success": True, "user": user}
 
-    #print("success_response: ", resp)
+    # print("success_response: ", resp)
 
     if data_field is None and data is None:
         return jsonify(resp)
 
     resp[data_field] = data
+    # print("success_response2: ", resp)
+
     return jsonify(resp)
 
 
