@@ -80,6 +80,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     //this.backend.getUsername().subscribe(manager => {
     //  alert(manager);
     //});
+    alert( this.currNamespace );
 
     this.backend.getUsername().subscribe(username => {
       if (Object.keys(username).length === 0) {
@@ -125,7 +126,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         this.poller.reset();
 
         this.backend.getManager(this.currNamespace).subscribe(manager => {
-            // alert(manager[0]);
+            alert(manager[0]);
             if( manager[0] === "manager" )
               this.isBasic = false;
             else
