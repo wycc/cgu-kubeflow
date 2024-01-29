@@ -2,9 +2,7 @@ import { Component, OnInit, Inject } from '@angular/core';
 import {COMMA, ENTER} from '@angular/cdk/keycodes';
 import {MatChipInputEvent} from '@angular/material/chips';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { StringDecoder } from 'string_decoder';
 import {ChangeDetectionStrategy} from '@angular/core';
-import {ScrollingModule} from '@angular/cdk/scrolling';
 import {Observable} from 'rxjs';
 import {FormControl} from '@angular/forms';
 import { JWABackendService } from 'src/app/services/backend.service';
@@ -75,7 +73,9 @@ export class DialogSharing implements OnInit {
   readonly separatorKeysCodes: number[] = [ENTER, COMMA];
   fruitCtrl = new FormControl();
   filteredFruits: Observable<string[]>;
- 
+  //viewlist = ['yuch917@gmail.com','illops19@gmail.com']
+  //editlist = ['yuch917@gmail.com','illops19@gmail.com']
+
   viewlist: string[] = [];
   editlist: string[] = [];
 
@@ -111,16 +111,25 @@ export class DialogSharing implements OnInit {
   //2024/01/20 可添加多個email功能完成 start//
   useremailNames: string[] = [];
   myString:string;
+   // 2024/01/29 YCL 加入錯誤訊息 start//
+  errorMessage: string = '';
   onSubmit() {
-     this.useremailNames = this.useremail.map(email => email.name);
-     if (this.useremailNames.length === 0 || !this.selected) {
-      window.alert('請填寫email或存取權');
-      console.log('請添加至少一個 Email 或選擇存取權限。');
+    this.useremailNames = this.useremail.map(email => email.name);
+    if (this.useremailNames.length === 0 || !this.selected) {
+      this.errorMessage = '請輸入“email”和選擇“存取權”';
+      console.log('請填寫“email”和選擇“存取權”');
     } else {
-      // 至少有一個不為空，執行相應的邏輯
-      this.dialogRef.close({ useremail: this.useremailNames, selected: this.selected });
+      if (this.useremailNames.some(email => this.viewlist.includes(email) || this.editlist.includes(email))) {
+        this.errorMessage = '欲添加的email已存在列表中，請刪除已存在的email。';
+        console.log('欲添加的email已存在列表中，請刪除已存在的email。');
+      } else {
+        this.dialogRef.close({ useremail: this.useremailNames, selected: this.selected });
+      }
     }
   }
+  // 2024/01/29 YCL 加入錯誤訊息 end//
+    
+  
      
   //2024/01/20 可添加多個email功能完成 end//
 
