@@ -73,8 +73,6 @@ export class DialogSharing implements OnInit {
   readonly separatorKeysCodes: number[] = [ENTER, COMMA];
   fruitCtrl = new FormControl();
   filteredFruits: Observable<string[]>;
-  //viewlist = ['yuch917@gmail.com','illops19@gmail.com']
-  //editlist = ['yuch917@gmail.com','illops19@gmail.com']
 
   viewlist: string[] = [];
   editlist: string[] = [];
