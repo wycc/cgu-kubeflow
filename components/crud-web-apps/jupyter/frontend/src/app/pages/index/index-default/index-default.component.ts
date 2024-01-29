@@ -141,14 +141,6 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     this.poller.stop();
   }
 
-  public viewClicked(notebook: NotebookProcessedObject) {
-    window.open(`/notebook/${notebook.namespace}/${notebook.name}/view`);
-  }
-  
-  public shareClicked(notebook: NotebookProcessedObject) {
-
-  }
-  
   // Event handling functions
   reactToAction(a: ActionEvent) {
     switch (a.action) {
