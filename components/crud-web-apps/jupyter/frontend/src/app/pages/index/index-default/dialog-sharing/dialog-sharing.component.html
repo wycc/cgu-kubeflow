@@ -50,6 +50,12 @@
   <button mat-raised-button color="primary" style="margin-left:10%;" (click)="onSubmit()">加入 </button>
   <button mat-raised-button color="primary" (click)="cancel()" style="margin-left:10%;" (click)="delete()">取消所有分享 </button>
 </div>
+<!--------------------------20240129 加入錯誤訊息 start----------------->
+<div *ngIf="errorMessage" style="color: red;text-align: center;">
+  {{ errorMessage }}
+</div>
+<br>
+<!--------------------------20240129 加入錯誤訊息 end----------------->
 <!----------------------------------20231217 mode selection in email end-------------------------------------------->
 
 <!----------------------------------20240109 extension panel start-------------------------------------------->
