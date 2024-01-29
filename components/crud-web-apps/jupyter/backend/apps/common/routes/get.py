@@ -4,6 +4,7 @@ from flask import request
 from .. import utils
 from . import bp
 import os
+import traceback
 
 log = logging.getLogger(__name__)
 
@@ -90,3 +91,18 @@ def get_gpu_vendors():
     available_vendors = installed_resources.intersection(config_vendor_keys)
 
     return api.success_response("vendors", list(available_vendors))
+
+#get authorizationpolicy start
+@bp.route("/api/namespaces/<namespace>/aps")
+def get_all_aps(namespace):
+    try:
+        aps = api.list_all_authorizationpolicy(namespace)["items"]
+        print(aps)
+        contents = [ap for ap in aps]
+        
+    except:
+        print("XXXXXXXXXXXXXXXXXXXX")
+        print(traceback.format_exc())
+        return api.success_response("authorizationpolicy", ["xxx"])  
+    return api.success_response("authorizationpolicy", contents)
+#get authorizationpolicy end
