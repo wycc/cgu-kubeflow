@@ -80,7 +80,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     //this.backend.getUsername().subscribe(manager => {
     //  alert(manager);
     //});
-    alert( this.currNamespace );
+    // alert( this.currNamespace );
 
     this.backend.getUsername().subscribe(username => {
       if (Object.keys(username).length === 0) {
@@ -126,7 +126,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         this.poller.reset();
 
         this.backend.getManager(this.currNamespace).subscribe(manager => {
-            alert(manager[0]);
+            // alert(manager[0]);
             if( manager[0] === "manager" )
               this.isBasic = false;
             else
@@ -141,6 +141,14 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     this.poller.stop();
   }
 
+  public viewClicked(notebook: NotebookProcessedObject) {
+    window.open(`/notebook/${notebook.namespace}/${notebook.name}/view`);
+  }
+  
+  public shareClicked(notebook: NotebookProcessedObject) {
+
+  }
+  
   // Event handling functions
   reactToAction(a: ActionEvent) {
     switch (a.action) {
@@ -264,7 +272,12 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         });
         // 2024/1/16 YC end //
         break;
-  }}
+      case 'view':
+        this.viewClicked(a.data);
+        break;
+        
+    }
+  }
 
   public templateClicked(notebook: NotebookProcessedObject) {
     if (notebook.isTemplate === 'yes') {

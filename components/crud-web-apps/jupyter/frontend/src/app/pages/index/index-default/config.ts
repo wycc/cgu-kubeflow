@@ -160,6 +160,13 @@ export const defaultAdvancedConfig: TableConfig = {
           text: $localize`CONNECT`,
         }),
         new ActionIconValue({
+          name: 'share',
+          tooltip: $localize`Share this notebook`,
+          color: '',
+          field: 'deleteAction',
+          iconReady: 'material:screen_share',
+        }),
+        new ActionIconValue({
           name: 'start-stop',
           tooltipInit: $localize`Stop this notebook server`,
           tooltipReady: $localize`Start this notebook server`,
