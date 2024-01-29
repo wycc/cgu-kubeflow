@@ -131,19 +131,23 @@ export class DialogSharing implements OnInit {
      
   //2024/01/20 可添加多個email功能完成 end//
 
+   //2024/01/20 可添加多個email功能完成 end//
+
  // CopyLink 選項 串連notebook的name和namespace start//
   updateCopyLink(){
     console.log('updateCopyLink:', this.selected);
     if (this.selected == 'option1') {
-      this.copylink = `http://120.126.23.231/notebook/${this.namespace}/${this.notebook}/view/`;
+      this.copylink = `${window.location.href}notebook/${this.namespace}/${this.notebook}/view/`;
     } else if(this.selected == 'option2') {
-      this.copylink = `http://120.126.23.231/notebook/${this.namespace}/${this.notebook}/`;
+      this.copylink = `${window.location.href}notebook/${this.namespace}/${this.notebook}/`;
     } else{
-      this.copylink = `http://120.126.23.231/notebook/${this.namespace}/${this.notebook}/`;
+      this.copylink = `${window.location.href}notebook/${this.namespace}/${this.notebook}/`;
     }
     console.log('copylink:', this.copylink);
+    console.log(window.location['href']);
   }
  // CopyLink 選項 串連notebook的name和namespace  end //
+
 
  // Expansion panel start // 
     panelOpenState = false;
