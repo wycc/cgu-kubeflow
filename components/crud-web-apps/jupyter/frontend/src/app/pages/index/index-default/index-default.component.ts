@@ -264,12 +264,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         });
         // 2024/1/16 YC end //
         break;
-      case 'view':
-        this.viewClicked(a.data);
-        break;
-        
-    }
-  }
+  }}
 
   public templateClicked(notebook: NotebookProcessedObject) {
     if (notebook.isTemplate === 'yes') {
