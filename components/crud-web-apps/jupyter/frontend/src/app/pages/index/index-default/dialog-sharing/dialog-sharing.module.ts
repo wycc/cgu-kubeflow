@@ -10,6 +10,7 @@ import { FormsModule } from '@angular/forms';
 import {MatDividerModule} from '@angular/material/divider';
 import {ClipboardModule} from '@angular/cdk/clipboard';
 import {MatExpansionModule} from '@angular/material/expansion';
+import {MatSnackBarModule} from '@angular/material/snack-bar';
 
 @NgModule({
   declarations: [
@@ -25,7 +26,8 @@ import {MatExpansionModule} from '@angular/material/expansion';
     FormsModule,
     MatDividerModule,
     ClipboardModule,
-    MatExpansionModule
+    MatExpansionModule,
+    MatSnackBarModule
   ],
 })
 export class DialogSharingModule { }
