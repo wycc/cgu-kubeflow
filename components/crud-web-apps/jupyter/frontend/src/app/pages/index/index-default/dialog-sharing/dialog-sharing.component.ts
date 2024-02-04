@@ -6,7 +6,10 @@ import {ChangeDetectionStrategy} from '@angular/core';
 import {Observable} from 'rxjs';
 import {FormControl} from '@angular/forms';
 import { JWABackendService } from 'src/app/services/backend.service';
-
+//2024/01/30 跳出成功加入訊息 start//
+import {MatSnackBar} from '@angular/material/snack-bar';
+import { Clipboard } from '@angular/cdk/clipboard';
+//2024/01/30 跳出成功加入訊息 end//
 export interface Useremail {
   name: string;
 }
@@ -20,11 +23,11 @@ export interface Useremail {
 export class DialogSharing implements OnInit {
   namespace: string;
   notebook: string;
- 
-  constructor(public backend: JWABackendService,private dialogRef: MatDialogRef<DialogSharing>, @Inject(MAT_DIALOG_DATA) public data: any) {
+ //2024/01/30 跳出成功加入訊息 start//
+  constructor(public backend: JWABackendService,private dialogRef: MatDialogRef<DialogSharing>, @Inject(MAT_DIALOG_DATA) public data: any,private snackBar: MatSnackBar,private clipboard: Clipboard) {
     this.namespace = data.namespace;
     this.notebook = data.name;
-    
+ //2024/01/30 跳出成功加入訊息 end//   
   }
   
   // 2024/01/21 分享清單內容 start//
@@ -74,6 +77,7 @@ export class DialogSharing implements OnInit {
   fruitCtrl = new FormControl();
   filteredFruits: Observable<string[]>;
 
+
   viewlist: string[] = [];
   editlist: string[] = [];
 
@@ -121,33 +125,39 @@ export class DialogSharing implements OnInit {
         this.errorMessage = '欲添加的email已存在列表中，請刪除已存在的email。';
         console.log('欲添加的email已存在列表中，請刪除已存在的email。');
       } else {
+        //2024/01/30 YCL 跳出成功加入訊息 start//
         this.dialogRef.close({ useremail: this.useremailNames, selected: this.selected });
+        //2024/02/04 YCL 自動複製連結 start//
+         // 複製連結
+        this.clipboard.copy(this.copylink);
+  
+        this.snackBar.open('成功加入email: ' + this.useremailNames+ '，並已複製連結。', 'Close', {
+          duration: 3000, 
+          horizontalPosition: 'center', 
+          verticalPosition: 'bottom'   
+      });
+      //2024/02/04 YCL 自動複製連結 end//
+      //2024/01/30 YCL 跳出成功加入訊息 end//
       }
     }
   }
   // 2024/01/29 YCL 加入錯誤訊息 end//
-    
-  
-     
   //2024/01/20 可添加多個email功能完成 end//
 
-   //2024/01/20 可添加多個email功能完成 end//
-
- // CopyLink 選項 串連notebook的name和namespace start//
-  updateCopyLink(){
-    console.log('updateCopyLink:', this.selected);
-    if (this.selected == 'option1') {
-      this.copylink = `${window.location.href}notebook/${this.namespace}/${this.notebook}/view/`;
-    } else if(this.selected == 'option2') {
-      this.copylink = `${window.location.href}notebook/${this.namespace}/${this.notebook}/`;
-    } else{
-      this.copylink = `${window.location.href}notebook/${this.namespace}/${this.notebook}/`;
-    }
-    console.log('copylink:', this.copylink);
-    console.log(window.location['href']);
+ /// CopyLink 選項 串連notebook的name和namespace start//
+ updateCopyLink(){
+  console.log('updateCopyLink:', this.selected);
+  if (this.selected == 'option1') {
+    this.copylink = `${window.location.href}notebook/${this.namespace}/${this.notebook}/view/`;
+  } else if(this.selected == 'option2') {
+    this.copylink = `${window.location.href}notebook/${this.namespace}/${this.notebook}/`;
+  } else{
+    this.copylink = `${window.location.href}notebook/${this.namespace}/${this.notebook}/`;
   }
- // CopyLink 選項 串連notebook的name和namespace  end //
-
+  console.log('copylink:', this.copylink);
+  console.log(window.location['href']);
+}
+// CopyLink 選項 串連notebook的name和namespace  end //
 
  // Expansion panel start // 
     panelOpenState = false;
