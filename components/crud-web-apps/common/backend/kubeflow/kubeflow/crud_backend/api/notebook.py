@@ -22,10 +22,10 @@ def create_notebook(notebook, namespace, dry_run=False):
     
 #Create authorization policy start #
 def create_authorization(authorization,namespace,dry_run=False):
-    authz.ensure_authorized(
-        "create", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
-    )
-    print(authorization)
+    # authz.ensure_authorized(
+    #    "create", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    #)
+    #print(authorization)
     return custom_api.create_namespaced_custom_object(
         "security.istio.io", "v1beta1", namespace, "authorizationpolicies",authorization,
         dry_run="All" if dry_run else None)
@@ -33,9 +33,9 @@ def create_authorization(authorization,namespace,dry_run=False):
 
 #2024/01/20 Delete authorization policy start#
 def delete_authorization(name,namespace):
-    authz.ensure_authorized(
-        "delete", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
-    )
+    #authz.ensure_authorized(
+    #    "delete", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    #)
     return custom_api.delete_namespaced_custom_object(
         group="security.istio.io",
         version="v1beta1",
@@ -47,9 +47,9 @@ def delete_authorization(name,namespace):
 
 #2024/01/23 Modify authorization policy start#
 def modify_authorization(namespace, name,body):
-    authz.ensure_authorized(
-        "patch", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
-    )
+    #authz.ensure_authorized(
+    #    "patch", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    #)
 
     return custom_api.patch_namespaced_custom_object(
         "security.istio.io", "v1beta1", namespace, "authorizationpolicies", name, body
@@ -58,9 +58,9 @@ def modify_authorization(namespace, name,body):
 
 #2024/01/23 Modify authorization policy start#
 def modify_authorization_delete(namespace, name,body):
-    authz.ensure_authorized(
-        "patch", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
-    )
+    #authz.ensure_authorized(
+    #    "patch", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    #)
 
     return custom_api.patch_namespaced_custom_object(
         "security.istio.io", "v1beta1", namespace, "authorizationpolicies", name, body
@@ -78,9 +78,9 @@ def list_notebooks(namespace):
     
 # List all authorizationpolicy start//    
 def list_all_authorizationpolicy(namespace):
-    authz.ensure_authorized(
-        "list", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
-    )
+    #authz.ensure_authorized(
+    #    "list", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    #)
     return custom_api.list_namespaced_custom_object(
         "security.istio.io", "v1beta1", namespace, "authorizationpolicies"
     )
