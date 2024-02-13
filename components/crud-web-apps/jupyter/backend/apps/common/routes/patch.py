@@ -4,6 +4,7 @@ from kubernetes import client, config
 from flask import  Flask, request, jsonify
 #2024/01/23 YCL modify
 from werkzeug import exceptions
+from kubernetes.config import ConfigException
 
 from kubeflow.kubeflow.crud_backend import api, decorators, logging
 
@@ -169,7 +170,11 @@ def notebook_is_stopped(namespace, notebook):
 #2024/01/23 YCL adding new email start
 @bp.route("/api/namespaces/<namespace>/aps_vnc/<name>", methods=["PATCH"])
 def modify_authorization(namespace, name):
-    config.load_kube_config()
+    try:
+        config.load_incluster_config()
+    except ConfigException:
+        config.load_kube_config()
+
     custom_api = client.CustomObjectsApi() 
     authorization_policy = custom_api.get_namespaced_custom_object('security.istio.io', 'v1beta1', namespace, 'authorizationpolicies', name)
 
@@ -194,7 +199,11 @@ def modify_authorization(namespace, name):
 #2024/01/23 YCL deleting new email start
 @bp.route("/api/namespaces/<namespace>/aps_vnc_1/<name>", methods=["PATCH"])
 def modify_authorizaiton_delete(namespace, name):
-    config.load_kube_config()
+    try:
+        config.load_incluster_config()
+    except ConfigException:
+        config.load_kube_config()
+        
     custom_api = client.CustomObjectsApi() 
     authorization_policy = custom_api.get_namespaced_custom_object('security.istio.io', 'v1beta1', namespace, 'authorizationpolicies', name)
     
