@@ -24,7 +24,9 @@ import {
 import { isEqual } from 'lodash';
 import { NotebookResponseObject, NotebookProcessedObject } from 'src/app/types';
 import { Router } from '@angular/router';
-
+// YCL 2023/12/03 start
+import { DialogSharing } from './dialog-sharing/dialog-sharing.component';
+// YCL 2023/12/03 end
 import { MatDialog } from '@angular/material/dialog';
 import { AddPostDialogComponent } from './add-post-dialog/add-post-dialog.component';
 
@@ -75,6 +77,11 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.poller = new ExponentialBackoff({ interval: 1000, retries: 3 });
 
+    //this.backend.getUsername().subscribe(manager => {
+    //  alert(manager);
+    //});
+    // alert( this.currNamespace );
+
     this.backend.getUsername().subscribe(username => {
       if (Object.keys(username).length === 0) {
         // Don't fire on empty config
@@ -88,7 +95,8 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       else
         this.isBasic = true;
 
-      // alert(username.substring(0,1));
+      //this.isBasic = false;  
+      //alert(username);
       //console.log("username", username)
     });
 
@@ -116,6 +124,14 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       this.ns.getSelectedNamespace().subscribe(ns => {
         this.currNamespace = ns;
         this.poller.reset();
+
+        this.backend.getManager(this.currNamespace).subscribe(manager => {
+            // alert(manager[0]);
+            if( manager[0] === "manager" )
+              this.isBasic = false;
+            else
+              this.isBasic = true;
+        });
       }),
     );
   }
@@ -124,22 +140,13 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     this.subs.unsubscribe();
     this.poller.stop();
   }
+
   public viewClicked(notebook: NotebookProcessedObject) {
     window.open(`/notebook/${notebook.namespace}/${notebook.name}/view`);
   }
+  
   public shareClicked(notebook: NotebookProcessedObject) {
-    if (notebook.status.phase === STATUS_TYPE.READY) {
-      this.actions.connectToNotebookDetail(notebook.namespace, notebook.name);
-    } else {
-      this.actions
-      .startNotebook(notebook.namespace, notebook.name)
-      .subscribe(_ => {
-        notebook.status.phase = STATUS_TYPE.WAITING;
-        notebook.status.message = 'Starting the Notebook Server.';
-        this.updateNotebookFields(notebook);
-        this.actions.connectToNotebookDetail(notebook.namespace, notebook.name);
-      });
-    }
+
   }
   
   // Event handling functions
@@ -174,7 +181,96 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         this.startStopClicked(a.data);
         break;
       case 'share':
-        this.shareClicked(a.data);
+        // this.shareClicked(a.data);
+        const dialogRef =this.dialog.open(DialogSharing,{ data: { namespace: a.data.namespace, name: a.data.name }});  
+        dialogRef.afterClosed().subscribe((result) => {
+            //const jsyaml = require('js-yaml');
+            if (result && result.useremail) {
+              const useremail = result.useremail;
+              console.log('User Email from Dialog:', useremail);
+              const selected = result.selected;
+              // if select "view" //
+              if (selected =='option1'){
+                const paths = `/notebook/${a.data.namespace}/${a.data.name}/view/*`;
+                const namevalue = `notebook-${a.data.name}-authorizationpolicy-view`;
+
+                this.backend.getAllAuthorizationPolicy(a.data.namespace).subscribe(aps => {
+                  console.log(a.data.namespace);
+                  var deletename = "notebook-" + a.data.name +"-authorizationpolicy-view";
+                  var names = aps.map((ap) => { return ap.metadata.name });
+                  var filteredNames = names.filter((name) => name.includes(deletename));
+              
+                if (filteredNames.length <= 0) {
+                  this.backend.createAuthorization(this.currNamespace,namevalue,paths,useremail).subscribe(
+                    (response) => {
+                    console.log("Success");
+                    console.log('currNamespace:', this.currNamespace);
+                    console.log('namevalue:', namevalue);
+                    console.log("paths:", paths);
+                    console.log("useremail:", useremail);
+                    console.log("selected-option:", selected);
+                    },
+                (error) => {
+                  console.error('Error creating authorization policy:', error);
+                });
+                }else {
+                  //2024/01/23 新增email功能 start
+                  this.backend.modify_authorizaiton(this.currNamespace,namevalue,useremail).subscribe(
+                    (response) => {
+                    console.log("Success for adding");
+                    console.log('currNamespace:', this.currNamespace);
+                    console.log('namevalue:', namevalue);
+                    console.log("useremail:", useremail);
+                    console.log("selected-option:", selected);
+                    },
+                    (error) => {
+                      console.log('filteredName != 0, existed');
+                  });
+              
+                }
+              });
+              //2024/01/23 新增email功能 end
+            }else{
+              // if select "editable" //
+              const paths = `/notebook/${a.data.namespace}/${a.data.name}/*`;
+              const namevalue = `notebook-${a.data.name}-authorizationpolicy-editable`;
+              this.backend.getAllAuthorizationPolicy(a.data.namespace).subscribe(aps => {
+                console.log(a.data.namespace);
+                var deletename = "notebook-" + a.data.name +"-authorizationpolicy-editable";
+                var names = aps.map((ap) => { return ap.metadata.name });
+                var filteredNames = names.filter((name) => name.includes(deletename));
+              if (filteredNames.length <= 0) {
+                this.backend.createAuthorization(this.currNamespace,namevalue,paths,useremail).subscribe(
+                (response) => {
+                  console.log("Success");
+                  console.log('currNamespace:', this.currNamespace);
+                  console.log('namevalue:', namevalue);
+                  console.log("paths:", paths);
+                  console.log("useremail:", useremail);
+                  console.log("selected-option:", selected);
+                },
+                (error) => {
+                  console.error('Error creating authorization policy:', error);
+                });
+              }else {
+                //2024/01/23 新增email功能 start
+                this.backend.modify_authorizaiton(this.currNamespace,namevalue,useremail).subscribe(
+                  (response) => {
+                  console.log("Success for adding");
+                  console.log('currNamespace:', this.currNamespace);
+                  console.log('namevalue:', namevalue);
+                  console.log("useremail:", useremail);
+                  console.log("selected-option:", selected);
+                  },
+                  (error) => {
+                    console.log('filteredName != 0, existed');
+                });
+              }
+            })};
+            //2024/01/23 新增email功能 end
+          }
+        });
+        // 2024/1/16 YC end //
         break;
       case 'view':
         this.viewClicked(a.data);

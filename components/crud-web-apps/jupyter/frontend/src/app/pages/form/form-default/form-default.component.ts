@@ -275,7 +275,9 @@ export class FormDefaultComponent implements OnInit, OnDestroy {
 
     const notebook = JSON.parse(notebookCopy);
     notebook.name = notebookForm.name;
+    notebook.origin_namespace = notebook.namespace
     notebook.namespace = this.currNamespace
+    notebook.template = notebook.workspace.newPvc.metadata.name
     notebook.workspace.newPvc.metadata.name = notebookForm.name + "-volume";
     this.backend.createNotebook(notebook).subscribe(() => {
       this.popup.close();

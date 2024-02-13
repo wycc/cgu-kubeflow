@@ -160,6 +160,13 @@ export const defaultAdvancedConfig: TableConfig = {
           text: $localize`CONNECT`,
         }),
         new ActionIconValue({
+          name: 'share',
+          tooltip: $localize`Share this notebook`,
+          color: '',
+          field: 'deleteAction',
+          iconReady: 'material:screen_share',
+        }),
+        new ActionIconValue({
           name: 'start-stop',
           tooltipInit: $localize`Stop this notebook server`,
           tooltipReady: $localize`Start this notebook server`,
@@ -275,6 +282,15 @@ export const defaultConfig: TableConfig = {
           field: 'connectAction',
           text: $localize`CONNECT`,
         }),
+         // 2023/08/29 YCL sharing start //
+        new ActionIconValue({
+          name: 'share',
+          tooltip: $localize`Share this notebook`,
+          color: '',
+          field: 'deleteAction',
+          iconReady: 'material:screen_share',
+        }),
+      // 2023/08/29 YCL sharing end //
         new ActionIconValue({
           name: 'start-stop',
           tooltipInit: $localize`Stop this notebook server`,

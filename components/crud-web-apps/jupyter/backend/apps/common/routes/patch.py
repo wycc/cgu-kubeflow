@@ -1,7 +1,10 @@
 import datetime as dt
-
-from flask import request
+#2024/01/23 YCL modify
+from kubernetes import client, config
+from flask import  Flask, request, jsonify
+#2024/01/23 YCL modify
 from werkzeug import exceptions
+from kubernetes.config import ConfigException
 
 from kubeflow.kubeflow.crud_backend import api, decorators, logging
 
@@ -163,3 +166,66 @@ def notebook_is_stopped(namespace, notebook):
     annotations = notebook.get("metadata", {}).get("annotations", {})
 
     return status.STOP_ANNOTATION in annotations
+
+#2024/01/23 YCL adding new email start
+@bp.route("/api/namespaces/<namespace>/aps_vnc/<name>", methods=["PATCH"])
+def modify_authorization(namespace, name):
+    try:
+        config.load_incluster_config()
+    except ConfigException:
+        config.load_kube_config()
+
+    custom_api = client.CustomObjectsApi() 
+    authorization_policy = custom_api.get_namespaced_custom_object('security.istio.io', 'v1beta1', namespace, 'authorizationpolicies', name)
+
+    values_to_add = request.json.get('values_to_add', [])
+    print("Values before modification:", authorization_policy["spec"]["rules"][0]["when"][0]["values"])
+    for new_value in values_to_add:
+        if new_value in authorization_policy["spec"]["rules"][0]["when"][0]["values"]:
+            continue
+        else:
+            # 添加新email
+            authorization_policy["spec"]["rules"][0]["when"][0]["values"].extend(values_to_add)
+
+    # 更新AuthorizationPolicy 
+    custom_api.patch_namespaced_custom_object('security.istio.io', 'v1beta1', namespace, 'authorizationpolicies', name, authorization_policy)
+    print("Values after modification:", authorization_policy["spec"]["rules"][0]["when"][0]["values"])
+    print("############")
+    print(values_to_add)
+
+    return jsonify({"message": "Authorization modified successfully"}), 200
+#2024/01/23 YCL adding new email end
+
+#2024/01/23 YCL deleting new email start
+@bp.route("/api/namespaces/<namespace>/aps_vnc_1/<name>", methods=["PATCH"])
+def modify_authorizaiton_delete(namespace, name):
+    try:
+        config.load_incluster_config()
+    except ConfigException:
+        config.load_kube_config()
+        
+    custom_api = client.CustomObjectsApi() 
+    authorization_policy = custom_api.get_namespaced_custom_object('security.istio.io', 'v1beta1', namespace, 'authorizationpolicies', name)
+    
+    values_to_delete = request.json.get('values_to_delete', [])
+    print("Received JSON data:", request.json)  # 添加这一行
+    print("Values before modification:", authorization_policy["spec"]["rules"][0]["when"][0]["values"])
+    for new_value in values_to_delete:
+        #if new_value in authorization_policy["spec"]["rules"][0]["when"][0]["values"]:
+            authorization_policy["spec"]["rules"][0]["when"][0]["values"].remove(new_value)
+        #else:
+            #continue
+    length = len(authorization_policy["spec"]["rules"][0]["when"][0]["values"])
+    if length != 0:
+        # 更新AuthorizationPolicy 
+        custom_api.patch_namespaced_custom_object('security.istio.io', 'v1beta1', namespace, 'authorizationpolicies', name, authorization_policy)
+        print("Values after modification:", authorization_policy["spec"]["rules"][0]["when"][0]["values"])
+        print("############")
+        print(values_to_delete)
+        return jsonify({"message": "Authorization modified successfully"}), 200
+    else:
+        print("zeroooooooooooo")
+        custom_api.delete_namespaced_custom_object('security.istio.io', 'v1beta1', namespace, 'authorizationpolicies', name)
+        return jsonify({"message": "Authorization deleted successfully"}), 200
+    
+#2024/01/23 YCL deleting new email end

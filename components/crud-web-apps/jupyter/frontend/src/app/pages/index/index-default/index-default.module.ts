@@ -7,10 +7,11 @@ import { AddPostDialogComponent } from './add-post-dialog/add-post-dialog.compon
 import { AfterPostNotifyComponent } from './after-post-notify/after-post-notify.component';
 import { KubeflowModule } from 'kubeflow';
 import {MatDialogModule } from '@angular/material/dialog';
+import {MatFormFieldModule} from '@angular/material/form-field';
 
 @NgModule({
   declarations: [IndexDefaultComponent, AddPostConfirmDialogComponent, AddPostDialogComponent, AfterPostNotifyComponent],
-  imports: [CommonModule, KubeflowModule, MatDialogModule, FormsModule],
+  imports: [CommonModule, KubeflowModule, MatDialogModule, FormsModule, MatFormFieldModule],
   exports: [IndexDefaultComponent],
 })
 export class IndexDefaultModule {}
