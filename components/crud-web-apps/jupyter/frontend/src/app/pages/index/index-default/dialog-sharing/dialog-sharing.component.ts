@@ -145,6 +145,7 @@ export class DialogSharing implements OnInit {
   //2024/01/20 可添加多個email功能完成 end//
 
  /// CopyLink 選項 串連notebook的name和namespace start//
+ // 2024/02/14 copylink 去除Pathname start//
  updateCopyLink(){
   console.log('updateCopyLink:', this.selected);
   console.log('href', window.location.href);
@@ -159,8 +160,8 @@ export class DialogSharing implements OnInit {
     this.copylink = `${window.location.href.replace(window.location.pathname, '')}notebook/${this.namespace}/${this.notebook}/`;
   }
   console.log('copylink:', this.copylink);
-  //console.log(window.location['href']);
 }
+  // 2024/02/14 copylink 去除Pathname end//
 // CopyLink 選項 串連notebook的name和namespace  end //
 
  // Expansion panel start // 
