@@ -4,6 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+     .dialog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .share-notebook {
+      text-align: center;
+      flex: 1;
+    }
+
+    .dialog-container {
+      max-height: 70vh; 
+      overflow-y: auto; 
+      overflow-x: hidden;
+    }
+
   .view-chip-list-container {
   overflow-y: auto;
   border: 1px solid #ccc;
@@ -12,14 +29,16 @@
 }
   </style>
 </head>
-<button mat-icon-button color="disabled" style="margin-left:95%;" (click)="cancel()">X</button>
-<h2 mat-dialog-title style="text-align: center;">
-  分享 Notebook : {{notebook}}
-</h2>
-
+<div class="dialog-header">
+  <h2 class="share-notebook" mat-dialog-title>
+    分享 Notebook : {{notebook}}
+  </h2>
+  <button mat-icon-button color="disabled" (click)="cancel()">X</button>
+</div>
+<div class="dialog-container">
 <!----------------------------------20231217 chip in email start-------------------------------------------->
 <p style="color:#0b5299">1. 新增使用者:</p> 
-<mat-form-field class="example-chip-list" style="width: 530px;">
+<mat-form-field class="example-chip-list" style="width: 600px;">
   <mat-chip-list #chipList>
     <mat-chip *ngFor="let useremail of useremail" [selectable]="selectable"
              [removable]="removable" (removed)="remove(useremail)">
@@ -38,7 +57,7 @@
 
 <!----------------------------------20231217 mode selection in email start-------------------------------------------->
 <p style="color:#0b5299;margin-top:3%">2. 選擇存取權:</p> 
-<mat-form-field style="width: 530px;">
+<mat-form-field style="width: 600px;">
   <mat-label>存取權 :</mat-label>
   <mat-select [(value)]="selected" (selectionChange)="updateCopyLink()" >
     <mat-option value="option1">僅檢視 (View Only)</mat-option>
@@ -70,7 +89,7 @@
     </mat-expansion-panel-header>
     <div class="view-chip-list-container">
       <ng-container *ngIf="viewlist && viewlist.length > 0; else viewOnlyNoData">
-      <mat-form-field class="view-chip-list" style="width: 470px;">
+      <mat-form-field class="view-chip-list" style="width: 450px; max-height: 200px;">
         <mat-label style=" font-size: 16px;">僅檢視(View Only)</mat-label> 
         <mat-chip-list #chipList>
           <mat-chip
@@ -91,7 +110,7 @@
       </ng-template>
       <br>
     <ng-container *ngIf="editlist && editlist.length > 0; else noData">
-      <mat-form-field class="edit-chip-list" style="width: 470px; ">
+      <mat-form-field class="edit-chip-list"  style="width: 470px; max-height: 200px; ">
         <mat-label style=" font-size: 16px;">可修改(Editable)</mat-label> 
         <mat-chip-list #chipList>
           <mat-chip
@@ -115,3 +134,6 @@
   </mat-expansion-panel>
 </mat-accordion>
 <!----------------------------------20240109 extension panel end-------------------------------------------->
+<br>
+</div>
+</html>
