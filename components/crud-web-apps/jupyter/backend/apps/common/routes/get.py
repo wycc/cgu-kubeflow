@@ -24,7 +24,7 @@ def get_manager(namespace):
     print("get_manager: ", namespace)
     if namespace is None:
         return "user"
-    profile = api.get_profile2(namespace)
+    profile = api.get_profile(namespace)
     manager = "user"
     if profile is not None:
         try:
