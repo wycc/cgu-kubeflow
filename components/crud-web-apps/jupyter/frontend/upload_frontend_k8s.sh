@@ -1,4 +1,4 @@
-POD=jupyter-web-app-deployment-bf78d959d-wf6t6
+POD=jupyter-web-app-deployment-6978859959-tdkd7
 cp -a dist dist2
 rm -rf dist/frontend/assets/logos
 tar czvf ff.tgz dist/frontend
