@@ -145,7 +145,6 @@ export class DialogSharing implements OnInit {
   //2024/01/20 可添加多個email功能完成 end//
 
  /// CopyLink 選項 串連notebook的name和namespace start//
- // 2024/02/14 copylink 去除Pathname start//
  updateCopyLink(){
   console.log('updateCopyLink:', this.selected);
   console.log('href', window.location.href);
@@ -153,15 +152,14 @@ export class DialogSharing implements OnInit {
   console.log('href without pathname:', window.location.href.replace(window.location.pathname, ''));
 
   if (this.selected == 'option1') {
-    this.copylink = `${window.location.href.replace(window.location.pathname, '')}notebook/${this.namespace}/${this.notebook}/view/`;
+    this.copylink = `${window.location.href.replace(window.location.pathname, '')}/notebook/${this.namespace}/${this.notebook}/view/`;
   } else if(this.selected == 'option2') {
-    this.copylink = `${window.location.href.replace(window.location.pathname, '')}notebook/${this.namespace}/${this.notebook}/`;
+    this.copylink = `${window.location.href.replace(window.location.pathname, '')}/notebook/${this.namespace}/${this.notebook}/`;
   } else{
-    this.copylink = `${window.location.href.replace(window.location.pathname, '')}notebook/${this.namespace}/${this.notebook}/`;
+    this.copylink = `${window.location.href.replace(window.location.pathname, '')}/notebook/${this.namespace}/${this.notebook}/`;
   }
   console.log('copylink:', this.copylink);
 }
-  // 2024/02/14 copylink 去除Pathname end//
 // CopyLink 選項 串連notebook的name和namespace  end //
 
  // Expansion panel start // 
