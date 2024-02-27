@@ -118,8 +118,8 @@ export class DialogSharing implements OnInit {
   onSubmit() {
     this.useremailNames = this.useremail.map(email => email.name);
     if (this.useremailNames.length === 0 || !this.selected) {
-      this.errorMessage = 'Please enter "email" and select "Access"!';
-      console.log('Please enter "email" and select "Access"!');
+      this.errorMessage = 'Please enter "email" and select "Access".';
+      console.log('Please enter "email" and select "Access".');
     } else {
       if (this.useremailNames.some(email => this.viewlist.includes(email) || this.editlist.includes(email))) {
         this.errorMessage = 'The email has already existed in the share list.';
@@ -243,4 +243,5 @@ export class DialogSharing implements OnInit {
  }
   // 2024/01/20 取消所有分享function end //
 }
+
 
