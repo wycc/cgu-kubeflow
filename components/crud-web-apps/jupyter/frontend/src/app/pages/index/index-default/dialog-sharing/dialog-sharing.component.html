@@ -62,7 +62,7 @@
 <mat-form-field style="width: 600px;">
   <mat-label>Access type :</mat-label>
   <mat-select [(value)]="selected" (selectionChange)="updateCopyLink()" >
-    <mat-option value="option1">View Only</mat-option>
+    <mat-option value="option1">View-Only</mat-option>
     <mat-option value="option2">Editable</mat-option>
   </mat-select>
 </mat-form-field>
@@ -92,7 +92,7 @@
     <div class="view-chip-list-container">
       <ng-container *ngIf="viewlist && viewlist.length > 0; else viewOnlyNoData">
       <mat-form-field class="view-chip-list" style="width: 450px; max-height: 200px;">
-        <mat-label style=" font-size: 16px;">View Only</mat-label> 
+        <mat-label style=" font-size: 16px;">View-Only</mat-label> 
         <mat-chip-list #chipList>
           <mat-chip
             *ngFor="let viewlist of viewlist"
@@ -108,7 +108,7 @@
     </ng-container>
     
       <ng-template #viewOnlyNoData>
-        <p style="margin-top: 10px;text-align: center;font-size: 14px;">"View Only" doesn't have any shared users currently.</p>
+        <p style="margin-top: 10px;text-align: center;font-size: 14px;">"View-Only" doesn't have any shared users currently.</p>
       </ng-template>
       <br>
     <ng-container *ngIf="editlist && editlist.length > 0; else noData">
