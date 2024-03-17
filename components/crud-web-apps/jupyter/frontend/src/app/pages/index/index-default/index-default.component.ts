@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 import { environment } from '@app/environment';
 import {
   NamespaceService,
@@ -29,6 +29,8 @@ import { DialogSharing } from './dialog-sharing/dialog-sharing.component';
 // YCL 2023/12/03 end
 import { MatDialog } from '@angular/material/dialog';
 import { AddPostDialogComponent } from './add-post-dialog/add-post-dialog.component';
+import { AbstractControl } from '@angular/forms';
+
 
 @Component({
   selector: 'app-index-default',
@@ -36,6 +38,9 @@ import { AddPostDialogComponent } from './add-post-dialog/add-post-dialog.compon
   styleUrls: ['./index-default.component.scss'],
 })
 export class IndexDefaultComponent implements OnInit, OnDestroy {
+  @Input()
+  searchControl: AbstractControl;
+
   env = environment;
   poller: ExponentialBackoff;
 
@@ -46,7 +51,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   subs = new Subscription();
 
   currentName = '';
-
+  
   //if (isBasicSetting) {
   //  this.config = defaultConfig;
   //} 
@@ -74,6 +79,17 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     public dialog: MatDialog,
   ) {}
 
+  search(event: any) {
+      var value = event;
+      this.processedData = this.rawData.filter((notebook) => {
+        console.log(notebook.name);
+        return (
+          notebook.name.includes(value) ||
+          notebook.namespace.includes(value) ||
+          notebook.image.includes(value)
+        );
+      });
+  };
   ngOnInit(): void {
     this.poller = new ExponentialBackoff({ interval: 1000, retries: 3 });
 
@@ -83,6 +99,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     // alert( this.currNamespace );
 
     this.backend.getUsername().subscribe(username => {
+
       if (Object.keys(username).length === 0) {
         // Don't fire on empty config
         //console.log("NO username")

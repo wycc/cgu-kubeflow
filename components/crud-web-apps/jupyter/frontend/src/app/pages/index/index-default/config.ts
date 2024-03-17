@@ -128,12 +128,14 @@ export const defaultAdvancedConfig: TableConfig = {
       textAlignment: 'right',
       value: new PropertyValue({ field: 'memory' }),
     },
+    /* Lance */
+    /*
     {
       matHeaderCellDef: $localize`Volumes`,
       matColumnDef: 'volumes',
       value: new MenuValue({ field: 'volumes', itemsIcon: 'storage' }),
     },
-
+    */
     {
       matHeaderCellDef: '',
       matColumnDef: 'actions',
@@ -258,12 +260,14 @@ export const defaultConfig: TableConfig = {
       textAlignment: 'right',
       value: new PropertyValue({ field: 'memory' }),
     },
+    /* Lance */
+    /*
     {
       matHeaderCellDef: $localize`Volumes`,
       matColumnDef: 'volumes',
       value: new MenuValue({ field: 'volumes', itemsIcon: 'storage' }),
     },
-
+    */
     {
       matHeaderCellDef: '',
       matColumnDef: 'actions',

@@ -118,12 +118,12 @@ export class DialogSharing implements OnInit {
   onSubmit() {
     this.useremailNames = this.useremail.map(email => email.name);
     if (this.useremailNames.length === 0 || !this.selected) {
-      this.errorMessage = '請輸入“email”和選擇“存取權”';
-      console.log('請填寫“email”和選擇“存取權”');
+      this.errorMessage = 'Please enter "email" and select "Access".';
+      console.log('Please enter "email" and select "Access".');
     } else {
       if (this.useremailNames.some(email => this.viewlist.includes(email) || this.editlist.includes(email))) {
-        this.errorMessage = '欲添加的email已存在列表中，請刪除已存在的email。';
-        console.log('欲添加的email已存在列表中，請刪除已存在的email。');
+        this.errorMessage = 'The email has already existed in the share list.';
+        console.log('The email has already existed in the share list.');
       } else {
         //2024/01/30 YCL 跳出成功加入訊息 start//
         this.dialogRef.close({ useremail: this.useremailNames, selected: this.selected });
@@ -131,8 +131,8 @@ export class DialogSharing implements OnInit {
          // 複製連結
         this.clipboard.copy(this.copylink);
   
-        this.snackBar.open('成功加入email: ' + this.useremailNames+ '，並已複製連結。', 'Close', {
-          duration: 3000, 
+        this.snackBar.open('Successfully added email: ' + this.useremailNames+ ', and the link has been copied.', 'Close', {
+          duration: 8000, 
           horizontalPosition: 'center', 
           verticalPosition: 'bottom'   
       });
@@ -145,7 +145,6 @@ export class DialogSharing implements OnInit {
   //2024/01/20 可添加多個email功能完成 end//
 
  /// CopyLink 選項 串連notebook的name和namespace start//
- // 2024/02/14 copylink 去除Pathname start//
  updateCopyLink(){
   console.log('updateCopyLink:', this.selected);
   console.log('href', window.location.href);
@@ -153,15 +152,14 @@ export class DialogSharing implements OnInit {
   console.log('href without pathname:', window.location.href.replace(window.location.pathname, ''));
 
   if (this.selected == 'option1') {
-    this.copylink = `${window.location.href.replace(window.location.pathname, '')}notebook/${this.namespace}/${this.notebook}/view/`;
+    this.copylink = `${window.location.href.replace(window.location.pathname, '')}/notebook/${this.namespace}/${this.notebook}/view/`;
   } else if(this.selected == 'option2') {
-    this.copylink = `${window.location.href.replace(window.location.pathname, '')}notebook/${this.namespace}/${this.notebook}/`;
+    this.copylink = `${window.location.href.replace(window.location.pathname, '')}/notebook/${this.namespace}/${this.notebook}/`;
   } else{
-    this.copylink = `${window.location.href.replace(window.location.pathname, '')}notebook/${this.namespace}/${this.notebook}/`;
+    this.copylink = `${window.location.href.replace(window.location.pathname, '')}/notebook/${this.namespace}/${this.notebook}/`;
   }
   console.log('copylink:', this.copylink);
 }
-  // 2024/02/14 copylink 去除Pathname end//
 // CopyLink 選項 串連notebook的name和namespace  end //
 
  // Expansion panel start // 
@@ -245,3 +243,5 @@ export class DialogSharing implements OnInit {
  }
   // 2024/01/20 取消所有分享function end //
 }
+
+
