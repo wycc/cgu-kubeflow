@@ -158,10 +158,22 @@ def notebook_dict_from_k8s_obj(notebook):
     log.info("Got isTemplate: %s" % isTemplate)
     
     shortImageVersion = ""
-    lst = cntr["image"].split("/")[-1].split(":")
-    stringcount = len(lst)
-    if stringcount>=2:
-        shortImageVersion = cntr["image"].split("/")[-1].split(":")[1]
+    shortImageName = ""
+    imageName = ""
+    shortImage = ""
+    try:
+        imageName = cntr["image"]
+        lst = cntr["image"].split("/")[-1].split(":")
+        shortImage = cntr["image"].split("/")[-1]
+        stringcount = len(lst)
+        if stringcount>=2:
+            shortImageName = cntr["image"].split("/")[-1].split(":")[0]
+            shortImageVersion = cntr["image"].split("/")[-1].split(":")[1]
+    except KeyError:
+        shortImageVersion = ""
+        shortImageName = ""
+        imageName = ""
+        shortImage = ""
 
     customerImageName = ""
     if notebook["metadata"].get("annotations"):
@@ -190,8 +202,8 @@ def notebook_dict_from_k8s_obj(notebook):
         "serverType": server_type,
         "age": helpers.get_uptime(notebook["metadata"]["creationTimestamp"]),
         "last_activity": get_notebook_last_activity(notebook),
-        "image": cntr["image"],
-        "shortImage": cntr["image"].split("/")[-1],
+        "image": imageName,
+        "shortImage": shortImage,
         "cpu": cntr["resources"]["requests"]["cpu"],
         "gpus": process_gpus(cntr),
         "memory": cntr["resources"]["requests"]["memory"],
@@ -199,7 +211,7 @@ def notebook_dict_from_k8s_obj(notebook):
         "status": status.process_status(notebook),
         "isTemplate": isTemplate,
         "jsonStr": jsonStr,
-        "shortImageName": cntr["image"].split("/")[-1].split(":")[0],
+        "shortImageName": shortImageName,
         "shortImageVersion": shortImageVersion,
         "customerImageName": customerImageName,
         "customerImageVersion": customerImageVersion,
