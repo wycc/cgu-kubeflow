@@ -81,14 +81,14 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
 
   search(event: any) {
       var value = event;
-      this.processedData = this.rawData.filter((notebook) => {
+      this.processedData = this.processIncomingData(this.rawData.filter((notebook) => {
         console.log(notebook.name);
         return (
           notebook.name.includes(value) ||
           notebook.namespace.includes(value) ||
           notebook.image.includes(value)
         );
-      });
+      }));
   };
   ngOnInit(): void {
     this.poller = new ExponentialBackoff({ interval: 1000, retries: 3 });
