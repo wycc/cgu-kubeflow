@@ -129,13 +129,11 @@ export const defaultAdvancedConfig: TableConfig = {
       value: new PropertyValue({ field: 'memory' }),
     },
     /* Lance */
-    /*
     {
       matHeaderCellDef: $localize`Volumes`,
       matColumnDef: 'volumes',
       value: new MenuValue({ field: 'volumes', itemsIcon: 'storage' }),
     },
-    */
     {
       matHeaderCellDef: '',
       matColumnDef: 'actions',
@@ -261,17 +259,18 @@ export const defaultConfig: TableConfig = {
       value: new PropertyValue({ field: 'memory' }),
     },
     /* Lance */
-    /*
+    
     {
       matHeaderCellDef: $localize`Volumes`,
       matColumnDef: 'volumes',
       value: new MenuValue({ field: 'volumes', itemsIcon: 'storage' }),
     },
-    */
+    
     {
       matHeaderCellDef: '',
       matColumnDef: 'actions',
       value: new ActionListValue([
+        /*
         new ActionIconValue({
           name: 'share',
           tooltip: $localize`Share link`,
@@ -279,6 +278,7 @@ export const defaultConfig: TableConfig = {
           field: 'shareAction',
           iconReady: 'material:share',
         }),
+        */
         new ActionButtonValue({
           name: 'connect',
           tooltip: $localize`Connect to this notebook server 1`,
