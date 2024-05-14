@@ -30,7 +30,7 @@ import { DialogSharing } from './dialog-sharing/dialog-sharing.component';
 import { MatDialog } from '@angular/material/dialog';
 import { AddPostDialogComponent } from './add-post-dialog/add-post-dialog.component';
 import { AbstractControl } from '@angular/forms';
-
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-index-default',
@@ -77,6 +77,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     public snackBar: SnackBarService,
     public router: Router,
     public dialog: MatDialog,
+    public route: ActivatedRoute
   ) {}
 
   search(event: any) {
@@ -158,14 +159,6 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     this.poller.stop();
   }
 
-  public viewClicked(notebook: NotebookProcessedObject) {
-    window.open(`/notebook/${notebook.namespace}/${notebook.name}/view`);
-  }
-  
-  public shareClicked(notebook: NotebookProcessedObject) {
-
-  }
-  
   // Event handling functions
   reactToAction(a: ActionEvent) {
     switch (a.action) {
