@@ -8,7 +8,7 @@ import {
 } from 'kubeflow';
 import { MatDialog } from '@angular/material/dialog';
 import { JWABackendService } from 'src/app/services/backend.service';
-import { Router } from '@angular/router';
+import {  ActivatedRoute, Router } from '@angular/router';
 import { IndexDefaultComponent } from '../index-default/index-default.component';
 
 @Component({
@@ -25,8 +25,9 @@ export class IndexRokComponent extends IndexDefaultComponent implements OnInit {
     public popup: SnackBarService,
     public router: Router,
     public dialog: MatDialog,
+    public route: ActivatedRoute,
   ) {
-    super(ns, backend, confirmDialog, popup, router, dialog);
+    super(ns, backend, confirmDialog, popup, router, dialog, route);
 
     this.rok.initCSRF();
   }
