@@ -275,7 +275,7 @@ public modify_authorizaiton_delete(nameSpace,namevalue,deletedata): Observable<s
   );
 }
 // 2024/01/23 YCL delete data end//
-  
+ 
   // DELETE
   public deleteNotebook(namespace: string, name: string) {
     const url = `api/namespaces/${namespace}/notebooks/${name}`;
@@ -284,9 +284,8 @@ public modify_authorizaiton_delete(nameSpace,namevalue,deletedata): Observable<s
       .delete<JWABackendResponse>(url)
       .pipe(catchError(error => this.handleError(error, false)));
   }
-}
-
-public checkNotebookAccess(namespace: string, name: string): Observable<boolean> {
+  
+  public checkNotebookAccess(namespace: string, name: string): Observable<boolean> {
     const url = `api/namespaces/${namespace}/check_notebook_access`;
     const requestBody = { name };
 
@@ -324,3 +323,5 @@ public checkNotebookAccess(namespace: string, name: string): Observable<boolean>
   }
   //2024/04/29 YC auto-start page access end//
 }
+
+
