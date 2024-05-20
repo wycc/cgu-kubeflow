@@ -124,7 +124,7 @@ export class IndexDefaultComponent2 implements OnInit, OnDestroy {
       this.currNamespace1 = params['namespace'];
       this.notebookName = params['notebook_name'];
       this.url1 = this.router.url
-      this.currNamespace2 = 'm1161002-2'
+      //this.currNamespace2 = 'm1161002-2'
 
       if (this.url1.includes('/view')) {
         this.url1 = 'view'
@@ -138,7 +138,7 @@ export class IndexDefaultComponent2 implements OnInit, OnDestroy {
       this.backend.getNotebooksaccess(this.currNamespace1,this.notebookName,this.url1).subscribe(values => {
         console.log('Values:', values);
         if (Array.isArray(values)) {
-          this.backend.getProfiles(this.currNamespace2).subscribe(email => {
+          this.backend.getProfiles(this.currNamespace).subscribe(email => {
             console.log('Email:', email);
             // 檢查 email 是否在 values 陣列中
             if (values.includes(email)) {
@@ -155,7 +155,7 @@ export class IndexDefaultComponent2 implements OnInit, OnDestroy {
               
             });
             } else {
-        // 如果用户未被授权，执行相应的操作，例如显示错误消息或重定向到其他页面
+        
         console.log('User is not authorized to access the notebook.');
         alert('Access denied! Please contact notebook owner.');
         }})}})})
