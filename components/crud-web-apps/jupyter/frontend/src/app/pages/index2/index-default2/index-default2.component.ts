@@ -24,20 +24,18 @@ import {
 import { isEqual } from 'lodash';
 import { NotebookResponseObject, NotebookProcessedObject } from 'src/app/types';
 import { Router } from '@angular/router';
-// YCL 2023/12/03 start
-import { DialogSharing } from './dialog-sharing/dialog-sharing.component';
-// YCL 2023/12/03 end
 import { MatDialog } from '@angular/material/dialog';
-import { AddPostDialogComponent } from './add-post-dialog/add-post-dialog.component';
+import { AddPostDialogComponent } from '../../index/index-default/add-post-dialog/add-post-dialog.component';
 import { AbstractControl } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-
+import { HttpClient } from '@angular/common/http';
+import { StringifyOptions } from 'querystring';
 @Component({
-  selector: 'app-index-default',
-  templateUrl: './index-default.component.html',
-  styleUrls: ['./index-default.component.scss'],
+  selector: 'app-index-default2',
+  templateUrl: './index-default2.component.html',
+  styleUrls: ['./index-default2.component.scss'],
 })
-export class IndexDefaultComponent implements OnInit, OnDestroy {
+export class IndexDefaultComponent2 implements OnInit, OnDestroy {
   @Input()
   searchControl: AbstractControl;
 
@@ -51,25 +49,14 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   subs = new Subscription();
 
   currentName = '';
-  currentField = '';
-
+  
   //if (isBasicSetting) {
   //  this.config = defaultConfig;
   //} 
       
   rawData: NotebookResponseObject[] = [];
-  processedData: NotebookProcessedObject[] = [];
+  processedData2: NotebookProcessedObject[] = [];
 
-  buttons: ToolbarButton[] = [
-    new ToolbarButton({
-      text: `New Notebook`,
-      icon: 'add',
-      stroked: true,
-      fn: () => {
-        this.router.navigate(['/new']);
-      },
-    }),
-  ];
 
   constructor(
     public ns: NamespaceService,
@@ -78,29 +65,17 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     public snackBar: SnackBarService,
     public router: Router,
     public dialog: MatDialog,
-    public route: ActivatedRoute
+    public route: ActivatedRoute,
+    public http: HttpClient
   ) {}
-
-  search(event: any) {
-      this.currentField = event;
-      this.processedData = this.processIncomingData(this.rawData.filter((notebook) => {
-        console.log(notebook.name);
-        return (
-          notebook.name.includes(this.currentField) ||
-          notebook.namespace.includes(this.currentField) ||
-          notebook.image.includes(this.currentField)
-        );
-      }));
-      this.poller.reset();
-  };
+  currNamespace1: string;
+  notebookName: string;
+  currNamespace2:string;
+  url1 :string;
   ngOnInit(): void {
+        
     this.poller = new ExponentialBackoff({ interval: 1000, retries: 3 });
-
-    //this.backend.getUsername().subscribe(manager => {
-    //  alert(manager);
-    //});
-    // alert( this.currNamespace );
-
+        
     this.backend.getUsername().subscribe(username => {
 
       if (Object.keys(username).length === 0) {
@@ -125,26 +100,8 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       this.poller.start().subscribe(() => {
         if (!this.currNamespace) {
           return;
-        }
+        }})
 
-        this.backend.getNotebooks(this.currNamespace).subscribe(notebooks => {
-          if (!isEqual(this.rawData, notebooks)) {
-            this.rawData = notebooks;
-
-            // Update the frontend's state
-            // this.processedData = this.processIncomingData(notebooks);
-            this.processedData = this.processIncomingData(this.rawData.filter((notebook) => {
-              console.log(notebook.name);
-              return (
-                notebook.name.includes(this.currentField) ||
-                notebook.namespace.includes(this.currentField) ||
-                notebook.image.includes(this.currentField)
-              );
-            }));
-            this.poller.reset();
-          }
-        });
-      }),
     );
 
     // Reset the poller whenever the selected namespace changes
@@ -162,139 +119,68 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         });
       }),
     );
-  }
+    this.route.params.subscribe(params => {
+      // 從路由參數中獲取 namespace 和 notebook_name
+      this.currNamespace1 = params['namespace'];
+      this.notebookName = params['notebook_name'];
+      this.url1 = this.router.url
+      //this.currNamespace2 = 'm1161002-2'
+
+      if (this.url1.includes('/view')) {
+        this.url1 = 'view'
+        console.log('The URL contains "/view"');
+      } else {
+        this.url1 = 'no'
+        console.log('The URL does not contain "/view"');
+      }
+
+
+      this.backend.getNotebooksaccess(this.currNamespace1,this.notebookName,this.url1).subscribe(values => {
+        console.log('Values:', values);
+        if (Array.isArray(values)) {
+          this.backend.getProfiles(this.currNamespace).subscribe(email => {
+            console.log('Email:', email);
+            // 檢查 email 是否在 values 陣列中
+            if (values.includes(email)) {
+              console.log('Email is in the array.');
+              this.backend.getsharedNotebooks(this.currNamespace1, this.notebookName).subscribe(notebooks => {
+              if (!isEqual(this.rawData, notebooks)) {
+                this.rawData = notebooks;
+                // Update the frontend's state
+                this.processedData2 = this.processIncomingData(notebooks);
+                this.poller.reset();
+              }
+              console.log('User success');
+              console.log(this.currNamespace)
+              
+            });
+            } else {
+        
+        console.log('User is not authorized to access the notebook.');
+        alert('Access denied! Please contact notebook owner.');
+        }})}})})
+
+    }
 
   ngOnDestroy() {
     this.subs.unsubscribe();
     this.poller.stop();
   }
-
+ 
+  
   // Event handling functions
   reactToAction(a: ActionEvent) {
-    switch (a.action) {
-      case 'template':
-        this.templateClicked(a.data);
-        break;
-      case 'remove-template':
-          this.templateClicked(a.data);
-          break;        
+    switch (a.action) {       
       case 'delete':
         this.deleteVolumeClicked(a.data);
-        /*
-        this.backend.getUsername().subscribe(username => {
-          if (Object.keys(username).length === 0) {
-            // Don't fire on empty config
-            console.log("NO username")
-            alert("NO username");
-            return;
-          }
-    
-          console.log("username", username)
-          alert(username);
-        });
-        */
         break;
       case 'connect':
-        this.connectClicked(a.data);
+        this.connectClicked();
         break;
       case 'start-stop':
         this.startStopClicked(a.data);
         break;
-      case 'share':
-        // this.shareClicked(a.data);
-        const dialogRef =this.dialog.open(DialogSharing,{ data: { namespace: a.data.namespace, name: a.data.name }});  
-        dialogRef.afterClosed().subscribe((result) => {
-            //const jsyaml = require('js-yaml');
-            if (result && result.useremail) {
-              const useremail = result.useremail;
-              console.log('User Email from Dialog:', useremail);
-              const selected = result.selected;
-              // if select "view" //
-              if (selected =='option1'){
-                const paths = `/notebook/${a.data.namespace}/${a.data.name}/view/*`;
-                const namevalue = `notebook-${a.data.name}-authorizationpolicy-view`;
-
-                this.backend.getAllAuthorizationPolicy(a.data.namespace).subscribe(aps => {
-                  console.log(a.data.namespace);
-                  var deletename = "notebook-" + a.data.name +"-authorizationpolicy-view";
-                  var names = aps.map((ap) => { return ap.metadata.name });
-                  var filteredNames = names.filter((name) => name.includes(deletename));
-              
-                if (filteredNames.length <= 0) {
-                  this.backend.createAuthorization(this.currNamespace,namevalue,paths,useremail).subscribe(
-                    (response) => {
-                    console.log("Success");
-                    console.log('currNamespace:', this.currNamespace);
-                    console.log('namevalue:', namevalue);
-                    console.log("paths:", paths);
-                    console.log("useremail:", useremail);
-                    console.log("selected-option:", selected);
-                    },
-                (error) => {
-                  console.error('Error creating authorization policy:', error);
-                });
-                }else {
-                  //2024/01/23 新增email功能 start
-                  this.backend.modify_authorizaiton(this.currNamespace,namevalue,useremail).subscribe(
-                    (response) => {
-                    console.log("Success for adding");
-                    console.log('currNamespace:', this.currNamespace);
-                    console.log('namevalue:', namevalue);
-                    console.log("useremail:", useremail);
-                    console.log("selected-option:", selected);
-                    },
-                    (error) => {
-                      console.log('filteredName != 0, existed');
-                  });
-              
-                }
-              });
-              //2024/01/23 新增email功能 end
-            }else{
-              // if select "editable" //
-              const paths = `/notebook/${a.data.namespace}/${a.data.name}/*`;
-              const namevalue = `notebook-${a.data.name}-authorizationpolicy-editable`;
-              this.backend.getAllAuthorizationPolicy(a.data.namespace).subscribe(aps => {
-                console.log(a.data.namespace);
-                var deletename = "notebook-" + a.data.name +"-authorizationpolicy-editable";
-                var names = aps.map((ap) => { return ap.metadata.name });
-                var filteredNames = names.filter((name) => name.includes(deletename));
-              if (filteredNames.length <= 0) {
-                this.backend.createAuthorization(this.currNamespace,namevalue,paths,useremail).subscribe(
-                (response) => {
-                  console.log("Success");
-                  console.log('currNamespace:', this.currNamespace);
-                  console.log('namevalue:', namevalue);
-                  console.log("paths:", paths);
-                  console.log("useremail:", useremail);
-                  console.log("selected-option:", selected);
-                },
-                (error) => {
-                  console.error('Error creating authorization policy:', error);
-                });
-              }else {
-                //2024/01/23 新增email功能 start
-                this.backend.modify_authorizaiton(this.currNamespace,namevalue,useremail).subscribe(
-                  (response) => {
-                  console.log("Success for adding");
-                  console.log('currNamespace:', this.currNamespace);
-                  console.log('namevalue:', namevalue);
-                  console.log("useremail:", useremail);
-                  console.log("selected-option:", selected);
-                  },
-                  (error) => {
-                    console.log('filteredName != 0, existed');
-                });
-              }
-            })};
-            //2024/01/23 新增email功能 end
-          }
-        });
-        // 2024/1/16 YC end //
-        break;
-      case 'view':
-        this.viewClicked(a.data);
-        break;
+      
         
     }
   }
@@ -401,25 +287,17 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       });
     });
   }
-  public connectClicked(notebook: NotebookProcessedObject) {
+  public connectClicked() {
+    let url: string;
+    if (window.location.href.includes('/view')) {
+        url = `/notebook/${this.currNamespace1}/${this.notebookName}/view`;
+    } else {
+        url = `/notebook/${this.currNamespace1}/${this.notebookName}/`;
+    }
     // Open new tab to work on the Notebook
-    window.open(`/notebook/${notebook.namespace}/${notebook.name}/`);
-    // this.showAddPostDialog(notebook);
+    window.open(url)
 
-    /*
-    this.backend.setCustomerParamNotebook(notebook,'customerImageName', 'qqqqqqqq').subscribe(() => {
-      this.poller.reset();
-    });
-
-    this.backend.setCustomerParamNotebook(notebook,'customerImageVersion', 'wwwwwwww').subscribe(() => {
-      this.poller.reset();
-    });
-
-    this.backend.setCustomerParamNotebook(notebook,'customerCourseName', 'eeeeeeee').subscribe(() => {
-      this.poller.reset();
-    });
-    */
-  }
+}
 
   public startStopClicked(notebook: NotebookProcessedObject) {
     if (notebook.status.phase === STATUS_TYPE.STOPPED) {
@@ -576,7 +454,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     return STATUS_TYPE.READY;
   }
 
-  public notebookTrackByFn(index: number, notebook: NotebookProcessedObject) {
+  public notebookTrackByFn2(index: number, notebook: NotebookProcessedObject) {
     return `${notebook.name}/${notebook.image}`;
   }
 

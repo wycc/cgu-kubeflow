@@ -124,3 +124,18 @@ def list_notebook_events(notebook, namespace):
     return v1_core.list_namespaced_event(
         namespace=namespace, field_selector=selector
     )
+    
+#2024 YC get notebook access start#
+def get_notebooks_access(namespace,notebook,url1):
+    authz.ensure_authorized(
+        "list", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
+    )
+    authorization_policies = custom_api.list_namespaced_custom_object(
+        "security.istio.io", "v1beta1", namespace, "authorizationpolicies"
+    )
+
+    if authorization_policies is None:
+        return []
+
+    return authorization_policies.get("items", [])
+#2024 YC get notebook access end#

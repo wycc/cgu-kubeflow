@@ -31,6 +31,20 @@ export class JWABackendService extends BackendService {
     );
   }
 
+  //2024 show autostart page notebook start//
+  public getsharedNotebooks(namespace: string,notebook_name:string): Observable<NotebookResponseObject[]> {
+    const url = `api/namespaces/${namespace}/notebooks`;
+    console.log('Requesting notebooks:', namespace);
+    return this.http.get<JWABackendResponse>(url).pipe(
+      catchError(error => this.handleError(error)),
+      map((resp: JWABackendResponse) => {
+        const filteredNotebooks = resp.notebooks.filter(notebook => notebook.name.includes(notebook_name));
+        return filteredNotebooks;
+      }),
+    );
+}
+ //2024 show autostart page notebook end//
+  
   public getNotebooks(namespace: string): Observable<NotebookResponseObject[]> {
     const url = `api/namespaces/${namespace}/notebooks`;
 
@@ -261,7 +275,7 @@ public modify_authorizaiton_delete(nameSpace,namevalue,deletedata): Observable<s
   );
 }
 // 2024/01/23 YCL delete data end//
-  
+ 
   // DELETE
   public deleteNotebook(namespace: string, name: string) {
     const url = `api/namespaces/${namespace}/notebooks/${name}`;
@@ -270,4 +284,44 @@ public modify_authorizaiton_delete(nameSpace,namevalue,deletedata): Observable<s
       .delete<JWABackendResponse>(url)
       .pipe(catchError(error => this.handleError(error, false)));
   }
+  
+  public checkNotebookAccess(namespace: string, name: string): Observable<boolean> {
+    const url = `api/namespaces/${namespace}/check_notebook_access`;
+    const requestBody = { name };
+
+
+    return this.http.post<boolean>(url, requestBody);
+  }
+
+  //2024/04/29 YC auto-start page access start//
+  public getNotebooksaccess(namespace: string,notebook:string,url1:string): Observable<JWABackendResponse> {
+    const url = `api/namespaces/${namespace}/aps-1/${notebook}/${url1}`;
+   
+  return this.http.get<JWABackendResponse>(url).pipe(
+    catchError(error => this.handleError(error)),
+    map((resp: JWABackendResponse) => {
+      return resp; // Return the entire backend response
+    }),
+  );
 }
+  //2024/04/29 YC auto-start page access end//
+
+  //2024/04/29 YC auto-start page get profile start//
+  public getProfiles(namespace: string): Observable<string> {
+    const url = `api/namespaces/${namespace}/aps-2`;
+  
+    return this.http.get<any>(url).pipe(
+      catchError(error => this.handleError(error)),
+      map((resp: any) => {
+        if (resp && resp.email) {
+          return resp.email; // 提取 email 字段
+        } else {
+          throw new Error('Failed to get email.');
+        }
+      }),
+    );
+  }
+  //2024/04/29 YC auto-start page access end//
+}
+
+

@@ -5,6 +5,7 @@ from .. import utils
 from . import bp
 import os
 import traceback
+import json
 
 log = logging.getLogger(__name__)
 
@@ -122,3 +123,44 @@ def get_all_aps(namespace):
         return api.success_response("authorizationpolicy", ["xxx"])  
     return api.success_response("authorizationpolicy", contents)
 #get authorizationpolicy end
+
+#2024 YC notebook access start#
+@bp.route("/api/namespaces/<namespace>/aps-1/<notebook>/<url1>")
+def get_notebooks_access(namespace,notebook,url1):
+    aps = api.get_notebooks_access(namespace,notebook,url1)
+
+    if "view" in url1:
+        authorization_name = f"notebook-{notebook}-authorizationpolicy-view"
+    else:
+        authorization_name = f"notebook-{notebook}-authorizationpolicy-editable"
+    print(authorization_name)
+    print(url1)
+    print("##############################")
+
+    target_ap = None
+    for ap in aps:
+        if not isinstance(ap, dict):
+            print("Received unexpected data format for an item in the list:", type(ap))
+            continue
+        if ap.get("metadata", {}).get("name") == authorization_name:
+            target_ap = ap
+            break
+    if target_ap is not None:
+        values = target_ap["spec"]["rules"][0]["when"][0]["values"]
+        print(values)
+        print("##############################")
+        return values
+    else:
+       values = ["None"]
+       return values
+#2024 YC notebook access end#
+
+#2024 YC get profile start#
+@bp.route("/api/namespaces/<namespace>/aps-2")
+def get_profile1(namespace):
+    profiles = api.get_profile(namespace)
+    annotations_json = json.loads(profiles['metadata']['annotations']['kubectl.kubernetes.io/last-applied-configuration'])
+    email = annotations_json['spec']['owner']['name']
+    print(email)
+    return api.success_response("email", email)
+#2024 YC get profile end#
