@@ -51,7 +51,8 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   subs = new Subscription();
 
   currentName = '';
-  
+  currentField = '';
+
   //if (isBasicSetting) {
   //  this.config = defaultConfig;
   //} 
@@ -80,15 +81,16 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   ) {}
 
   search(event: any) {
-      var value = event;
+      this.currentField = event;
       this.processedData = this.processIncomingData(this.rawData.filter((notebook) => {
         console.log(notebook.name);
         return (
-          notebook.name.includes(value) ||
-          notebook.namespace.includes(value) ||
-          notebook.image.includes(value)
+          notebook.name.includes(this.currentField) ||
+          notebook.namespace.includes(this.currentField) ||
+          notebook.image.includes(this.currentField)
         );
       }));
+      this.poller.reset();
   };
   ngOnInit(): void {
     this.poller = new ExponentialBackoff({ interval: 1000, retries: 3 });
@@ -129,7 +131,15 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
             this.rawData = notebooks;
 
             // Update the frontend's state
-            this.processedData = this.processIncomingData(notebooks);
+            // this.processedData = this.processIncomingData(notebooks);
+            this.processedData = this.processIncomingData(this.rawData.filter((notebook) => {
+              console.log(notebook.name);
+              return (
+                notebook.name.includes(this.currentField) ||
+                notebook.namespace.includes(this.currentField) ||
+                notebook.image.includes(this.currentField)
+              );
+            }));
             this.poller.reset();
           }
         });

@@ -161,7 +161,9 @@ def notebook_dict_from_k8s_obj(notebook):
     shortImageName = ""
     imageName = ""
     shortImage = ""
+    volumeMounts = ""
     try:
+        volumeMounts = [v["name"] for v in cntr["volumeMounts"]]
         imageName = cntr["image"]
         lst = cntr["image"].split("/")[-1].split(":")
         shortImage = cntr["image"].split("/")[-1]
@@ -170,6 +172,7 @@ def notebook_dict_from_k8s_obj(notebook):
             shortImageName = cntr["image"].split("/")[-1].split(":")[0]
             shortImageVersion = cntr["image"].split("/")[-1].split(":")[1]
     except KeyError:
+        volumeMounts = ""
         shortImageVersion = ""
         shortImageName = ""
         imageName = ""
@@ -207,7 +210,7 @@ def notebook_dict_from_k8s_obj(notebook):
         "cpu": cntr["resources"]["requests"]["cpu"],
         "gpus": process_gpus(cntr),
         "memory": cntr["resources"]["requests"]["memory"],
-        "volumes": [v["name"] for v in cntr["volumeMounts"]],
+        "volumes": volumeMounts,
         "status": status.process_status(notebook),
         "isTemplate": isTemplate,
         "jsonStr": jsonStr,
