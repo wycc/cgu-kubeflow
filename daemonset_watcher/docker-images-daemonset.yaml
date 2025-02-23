@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: docker-images
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: docker-images
+  template:
+    metadata:
+      labels:
+        app: docker-images
+    spec:
+      containers:
+      - name: list-images
+        image: docker:latest
+        command:
+          - /bin/sh
+          - -c
+          - |
+            echo "Node $(hostname) - Listing images via docker images (filter: cguaicadmin):"
+            docker images | grep '^cguaicadmin' || echo "No images starting with cguaicadmin found."
+            # 保持 Pod 存活一段時間，方便日後收集 logs
+            sleep 3600
+        volumeMounts:
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+        securityContext:
+          privileged: true
+      volumes:
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
