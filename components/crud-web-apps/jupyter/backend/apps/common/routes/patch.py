@@ -304,6 +304,16 @@ def enable_disable_template_notebook(namespace, notebook, request_body):
     )
     api.patch_notebook(notebook, namespace, patch_body)
 
+#2025/02/26 Lance delete authorizationpolicy start
+@bp.route("/api/namespaces/<namespace>/aps_vnc_1/<name>", methods=["PATCH"])
+
+def patch_authorization(name, namespace):
+    # api.delete_authorization(name, namespace)
+
+    return api.success_response(
+        "message", "Authorization %s successfully deleted." % name
+    )
+#2025/02/26 Lance delete authorizationpolicy end
 
 @bp.route(
     "/api/namespaces/<orig>/<namespace>/sharednotebooks/<notebook>", methods=["PATCH"]
