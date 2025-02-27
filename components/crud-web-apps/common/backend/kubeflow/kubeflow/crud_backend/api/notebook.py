@@ -1,4 +1,5 @@
 from .. import authz
+from kubernetes import client, config
 from . import custom_api, events, utils
 
 
@@ -118,26 +119,130 @@ def delete_authorization(name,namespace):
     ) 
 #2024/01/20 Delete authorization policy end#
 
-#2024/01/23 Modify authorization policy start#
-def modify_authorization(namespace, name,body):
+#2024/01/23 Modify authorization policy start, Lance modify 2025/02/28#
+def modify_authorization_add(namespace, name, new_user):
     #authz.ensure_authorized(
     #    "patch", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
     #)
 
-    return custom_api.patch_namespaced_custom_object(
-        "security.istio.io", "v1beta1", namespace, "authorizationpolicies", name, body
-    )
+    #return custom_api.patch_namespaced_custom_object(
+    #    "security.istio.io", "v1beta1", namespace, "authorizationpolicies", name, body
+    #)
+    try:
+
+        if not namespace or not name or not new_user:
+            print("Missing required parameters")
+            return
+
+        # Fetch the existing AuthorizationPolicy
+        auth_policy = custom_api.get_namespaced_custom_object(
+            group="security.istio.io",
+            version="v1",
+            namespace=namespace,
+            plural="authorizationpolicies",
+            name=name
+        )
+
+        # Locate the 'values' field in `when`
+        rules = auth_policy.get("spec", {}).get("rules", [])
+        if not rules:
+            raise ValueError("No rules found in AuthorizationPolicy")
+
+        when_conditions = rules[0].get("when", [])
+        for condition in when_conditions:
+            if condition["key"] == "request.headers[kubeflow-userid]":
+                # Add the new user email if it's not already in the list
+                if new_user not in condition["values"]:
+                    condition["values"].append(new_user)
+                break
+        else:
+            # If no matching "when" condition is found, create a new one
+            when_conditions.append({
+                "key": "request.headers[kubeflow-userid]",
+                "values": [new_user]
+            })
+
+        # Prepare the patch data
+        patch_body = {"spec": {"rules": rules}}
+
+        # Patch the AuthorizationPolicy
+        updated_policy = custom_api.patch_namespaced_custom_object(
+            group="security.istio.io",
+            version="v1",
+            namespace=namespace,
+            plural="authorizationpolicies",
+            name=name,
+            body=patch_body
+        )
+
+        print( "AuthorizationPolicy updated")
+
+    except client.exceptions.ApiException as e:
+        print(f"Kubernetes API error: {e}")
+    except Exception as e:
+        print(f"Internal server error: {str(e)}")
+
 #2024/01/23 Modify authorization policy end#
 
-#2024/01/23 Modify authorization policy start#
-def modify_authorization_delete(namespace, name,body):
+#2024/01/23 Modify authorization policy start, Lance modify 2025/02/28#
+def modify_authorization_delete(namespace, name, user_to_remove):
     #authz.ensure_authorized(
     #    "patch", "security.istio.io", "v1beta1", "authorizationpolicies", namespace
     #)
 
-    return custom_api.patch_namespaced_custom_object(
-        "security.istio.io", "v1beta1", namespace, "authorizationpolicies", name, body
-    )
+    #return custom_api.patch_namespaced_custom_object(
+    #    "security.istio.io", "v1beta1", namespace, "authorizationpolicies", name, body
+    #)
+    try:
+
+        if not namespace or not name or not user_to_remove:
+            print("Missing required parameters")
+            return
+
+        # Fetch the existing AuthorizationPolicy
+        auth_policy = custom_api.get_namespaced_custom_object(
+            group="security.istio.io",
+            version="v1",
+            namespace=namespace,
+            plural="authorizationpolicies",
+            name=name
+        )
+
+        # Locate the 'values' field in `when`
+        rules = auth_policy.get("spec", {}).get("rules", [])
+        if not rules:
+            raise ValueError("No rules found in AuthorizationPolicy")
+
+        when_conditions = rules[0].get("when", [])
+        for condition in when_conditions:
+            if condition["key"] == "request.headers[kubeflow-userid]":
+                # Remove the user if it exists in the list
+                if user_to_remove in condition["values"]:
+                    condition["values"].remove(user_to_remove)
+                    print(f"User {user_to_remove} removed.")
+                else:
+                    print(f"User {user_to_remove} not found.")
+                break
+
+        # Prepare the patch data
+        patch_body = {"spec": {"rules": rules}}
+
+        # Patch the AuthorizationPolicy
+        updated_policy = custom_api.patch_namespaced_custom_object(
+            group="security.istio.io",
+            version="v1",
+            namespace=namespace,
+            plural="authorizationpolicies",
+            name=name,
+            body=patch_body
+        )
+
+        print("AuthorizationPolicy updated successfully.")
+
+    except client.exceptions.ApiException as e:
+        print(f"Kubernetes API error: {e}")
+    except Exception as e:
+        print(f"Internal server error: {str(e)}")
 #2024/01/23 Modify authorization policy end#
 
 # List all authorizationpolicy start//    

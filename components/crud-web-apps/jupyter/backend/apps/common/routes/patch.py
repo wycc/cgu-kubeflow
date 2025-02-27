@@ -305,10 +305,45 @@ def enable_disable_template_notebook(namespace, notebook, request_body):
     api.patch_notebook(notebook, namespace, patch_body)
 
 #2025/02/26 Lance delete authorizationpolicy start
+@bp.route("/api/namespaces/<namespace>/aps_vnc/<name>", methods=["PATCH"])
+
+def patch_authorization_add(name, namespace):
+    # api.delete_authorization(name, namespace)
+    request_body = request.get_json()
+    log.info("Got body: %s", request_body)
+    log.info(" patch_authorization '%s/%s'", name, namespace)
+    # Extract 'values_to_delete'
+    values_to_add = request_body.get("values_to_add", [])
+
+    # Debugging output
+    print("Users to add:", values_to_add)
+
+    # Loop through each user and call the function
+    for user_to_add in values_to_add:
+        api.modify_authorization_add(namespace, name, user_to_add)
+
+    return api.success_response(
+        "message", "Authorization %s successfully deleted." % name
+    )
+#2025/02/26 Lance delete authorizationpolicy end
+
+#2025/02/26 Lance delete authorizationpolicy start
 @bp.route("/api/namespaces/<namespace>/aps_vnc_1/<name>", methods=["PATCH"])
 
-def patch_authorization(name, namespace):
+def patch_authorization_delete(name, namespace):
     # api.delete_authorization(name, namespace)
+    request_body = request.get_json()
+    log.info("Got body: %s", request_body)
+    log.info(" patch_authorization '%s/%s'", name, namespace)
+    # Extract 'values_to_delete'
+    values_to_delete = request_body.get("values_to_delete", [])
+
+    # Debugging output
+    print("Users to delete:", values_to_delete)
+
+    # Loop through each user and call the function
+    for user_to_remove in values_to_delete:
+        api.modify_authorization_delete(namespace, name, user_to_remove)
 
     return api.success_response(
         "message", "Authorization %s successfully deleted." % name
