@@ -55,5 +55,6 @@ scripts/gke/build/**
 # Created after running JWA e2e tests
 **/geckodriver.log
 
-./cgu/daemonset_watcher/go.mod
-./cgu/daemonset_watcher/go.sum
+cgu/daemonset_watcher/go.mod
+cgu/daemonset_watcher/go.sum
+cgu/daemonset_watcher/daemonset_watcher
