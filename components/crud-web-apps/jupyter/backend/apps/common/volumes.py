@@ -154,3 +154,20 @@ def add_notebook_container_mount(notebook, container_mount):
 
     container["volumeMounts"].append(container_mount)
     return notebook
+
+# Lance begin 20240907
+def add_notebook_container_source_mount(notebook, container_mount):
+    """
+    Add the provided container mount (dict V1VolumeMount) to the Notebook's
+    PodSpec.
+
+    notebook: Notebook CR dict
+    volume: Podvolume dict
+    """
+    container = notebook["spec"]["template"]["spec"]["containers"][1]
+    if "volumeMounts" not in container:
+        container["volumeMounts"] = []
+
+    container["volumeMounts"].append(container_mount)
+    return notebook
+# Lance end 20240907

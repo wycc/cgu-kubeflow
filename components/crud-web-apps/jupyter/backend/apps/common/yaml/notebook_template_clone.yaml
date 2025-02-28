@@ -1,0 +1,63 @@
+apiVersion: kubeflow.org/v1beta1
+kind: Notebook
+metadata:
+  name: {name}
+  namespace: {namespace}
+  labels:
+    app: {name}
+    isTemplateName: {isTemplate}
+  annotations:
+    notebooks.kubeflow.org/server-type: ""
+    notebooks.kubeflow.org/creator: {creator}
+    jsonStr: {jsonStr}    
+spec:
+  template:
+    spec:
+      serviceAccountName: {serviceAccount}
+      containers:
+        - name: {name}
+          image: ""
+          volumeMounts: []
+          resources:
+            requests:
+              cpu: "0.1"
+              memory: "0.1Gi"
+          securityContext:
+            capabilities:
+              add:
+              - IPC_LOCK              
+        - image: cguaicadmin/qnapcopy:v0.1.8
+          name: clone
+          env:
+            - name: IP
+              valueFrom: 
+                secretKeyRef:
+                  name: qnap
+                  key: ip
+            - name: PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qnap
+                  key: password
+            - name: USERNAME
+              valueFrom: 
+                secretKeyRef:
+                  name: qnap
+                  key: username
+          resources:
+            limits:
+              cpu: 300m
+              memory: 1Gi
+            requests:
+              cpu: 300m
+              memory: 1Gi
+          command:
+          - /bin/sh
+          args:
+          - -c
+          - if [ ! -f /home/jovyan/.clonedone ]; then python /script.py {namespace} {templatePvcName} {destvolume}; touch /home/jovyan/.clonedone; sleep 365d; else sleep 365d; fi
+          volumeMounts:
+          - mountPath: /source
+            name: {templatePvcName}
+      volumes: []
+      tolerations: []
