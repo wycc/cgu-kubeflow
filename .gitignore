@@ -57,4 +57,4 @@ scripts/gke/build/**
 
 cgu/daemonset_watcher/go.mod
 cgu/daemonset_watcher/go.sum
-cgu/daemonset_watcher/daemonset_watcher
+cgu/daemonset_watcher/daemonset-watcher
