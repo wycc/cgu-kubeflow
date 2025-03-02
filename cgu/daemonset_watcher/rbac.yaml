@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: daemonset-watcher-sa
-  namespace: default
+  namespace: pullimage
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -23,7 +23,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: daemonset-watcher-sa
-    namespace: default
+    namespace: pullimage
 roleRef:
   kind: ClusterRole
   name: daemonset-watcher-role
