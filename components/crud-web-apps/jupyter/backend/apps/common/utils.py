@@ -23,6 +23,20 @@ NOTEBOOK_TEMPLATE_CLONE_YAML = os.path.join(
     FILE_ABS_PATH, "yaml/notebook_template_clone.yaml"
 )
 
+CLONES = [
+    "/etc/config/notebook_template_clone.yaml",
+    NOTEBOOK_TEMPLATE_CLONE_YAML,
+]
+
+def get_first_existing_file(file_list):
+    for file in file_list:
+        if isinstance(file, str) and os.path.exists(file):
+            return file
+        elif isinstance(file, str):
+            print(f"File not found: {file}")
+        else:
+            print(f"Invalid entry: {file}")
+    return None
 
 AUTHORIZATIONPOLICY_TEMPLATE_YAML = os.path.join(
     FILE_ABS_PATH, "yaml/authorizationpolicy_template.yaml"
