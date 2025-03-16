@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -432,6 +433,19 @@ func generateStatefulSet(instance *v1beta1.Notebook) *appsv1.StatefulSet {
 			}
 		}
 	}
+	// Adjust CPU requests to be half of the original value
+	for i := range podSpec.Containers {
+		container := &podSpec.Containers[i]
+		if container.Resources.Requests != nil {
+			if cpuRequest, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+				// Halve the CPU request
+				halfCPU := cpuRequest.DeepCopy()
+				halfCPU.SetScaled(halfCPU.ScaledValue(resource.Milli)/2, resource.Milli)
+				container.Resources.Requests[corev1.ResourceCPU] = halfCPU
+			}
+		}
+	}
+
 	return ss
 }
 
