@@ -1,3 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cost-config
+  namespace: cgu
+data:
+  CPU_COST_PER_MINUTE: "1"
+  GPU_COST_PER_MINUTE: "2"
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,10 +35,12 @@ spec:
             requests:
               cpu: 200m
               memory: 256Mi
-          image: markjiang10/cgu-monitor:v62 #your-docker-username/your-repository:your-tag  
+          image: markjiang10/cgu-monitor:v70 #your-docker-username/your-repository:your-tag  
           ports:
           - containerPort: 8080  # Prometheus 客户端暴露的端口
-
+          envFrom:
+            - configMapRef:
+                name: cost-config
 ---
 
 apiVersion: monitoring.coreos.com/v1
