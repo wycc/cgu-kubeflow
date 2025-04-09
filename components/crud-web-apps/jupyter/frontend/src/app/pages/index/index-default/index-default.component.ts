@@ -32,6 +32,8 @@ import { MatDialog } from '@angular/material/dialog';
 // YCL 2023/12/03 start
 import { AbstractControl } from '@angular/forms';
 import { DialogSharing } from './dialog-sharing/dialog-sharing.component';
+import { _fixedSizeVirtualScrollStrategyFactory } from '@angular/cdk/scrolling';
+import { __classPrivateFieldSet } from 'tslib';
 // YCL 2023/12/03 end
 
 @Component({
@@ -101,6 +103,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       this.poll(ns);
       this.newNotebookButton.namespaceChanged(ns, $localize`Notebook`);
     });
+
 
     this.backend.getUsername().subscribe(username => {
 
@@ -371,7 +374,6 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         this.updateNotebookFields(notebook);
       });
   }
-
   // Data processing functions
   updateNotebookFields(notebook: NotebookProcessedObject) {
     /* Lance - Begin 0906 */
