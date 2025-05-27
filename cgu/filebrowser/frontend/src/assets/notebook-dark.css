@@ -1,0 +1,72 @@
+/* Notebook 整體區塊 */
+.jp-Notebook {
+    background-color: transparent !important;
+    color: #e0e0e0;
+    font-family: sans-serif;
+  }
+  
+  /* 每一格 cell */
+  .jp-Notebook .jp-Cell {
+    background-color: #1e1e1e !important;
+    border: 1px solid #444;
+    margin: 12px 0;
+    padding: 12px;
+    border-radius: 6px;
+    color: #e0e0e0;
+  }
+  
+  /* Markdown 標題與內容 */
+  .jp-MarkdownCell h1,
+  .jp-MarkdownCell h2,
+  .jp-MarkdownCell h3,
+  .jp-MarkdownCell p {
+    color: #e0e0e0;
+  }
+  
+  /* code cell prompt，例如 [1] */
+  .jp-InputPrompt {
+    color: #888;
+  }
+  
+  /* 編輯器本體背景 + 文字 */
+  .cm-editor,
+  .cm-scroller,
+  .cm-content {
+    background-color: #1e1e1e !important;
+    color: #e0e0e0 !important;
+  }
+  
+  /* code cell 的外框 */
+  .jp-CodeCell .jp-InputArea {
+    background-color: #1e1e1e;
+    border: 1px solid #444;
+  }
+  /* 移除 CodeMirror 焦點白框 */
+  .cm-editor.cm-focused {
+    outline: none !important;
+  }
+  
+  /* 高亮 - 關鍵字、函數、字串 */
+  .cm-line span[class*="ͼ"] {
+    color: #c586c0 !important; /* fallback 顏色 */
+  }
+  
+  /* 額外：常見語法類型 */
+  span.cm-keyword {
+    color: #569cd6 !important;
+  }
+  span.cm-def {
+    color: #dcdcaa !important;
+  }
+  span.cm-variable {
+    color: #9cdcfe !important;
+  }
+  span.cm-string {
+    color: #ce9178 !important;
+  }
+  span.cm-number {
+    color: #b5cea8 !important;
+  }
+  span.cm-comment {
+    color: #6a9955 !important;
+  }
