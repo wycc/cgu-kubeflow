@@ -41,7 +41,7 @@ const routes = [
     component: Login,
   },
   {
-    path: "/viewipynb",
+    path: "/share/viewipynb",
     name: "ViewIpynb",
     component: ViewIpynb,
   },

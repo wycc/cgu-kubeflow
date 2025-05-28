@@ -58,7 +58,7 @@ onMounted(async () => {
   const token = route.query.token as string || '';
   try {
     // 取得 notebook 內容（用 public dl）
-    const res = await fetch(`${window.location.href.split("/").slice(0, -1).join("/")}/api/public/dl/${encodeURIComponent(token)}?inline=true`);
+    const res = await fetch(`${window.location.href.split("/").slice(0, -2).join("/")}/api/public/dl/${encodeURIComponent(token)}?inline=true`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
     notebookContent.value = text;
@@ -101,7 +101,6 @@ const jupyterUrl = computed(() => {
   return parts.slice(0, 7).join("/") + "/contents";
 });
 const sendPutRequest = async () => {
-  const path = window.location.href.split("/").slice(7, -1).join("/");
   const response = await fetch(fileUrl.value, {
     method: "PUT",
     headers: {
