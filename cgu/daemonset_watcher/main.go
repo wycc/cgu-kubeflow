@@ -61,43 +61,44 @@ func main() {
 	factory := informers.NewSharedInformerFactory(clientset, 5*time.Minute)
 
 	// 取得 Deployment 與 ConfigMap 的 informer
-	deploymentInformer := factory.Apps().V1().Deployments().Informer()
+	//deploymentInformer := factory.Apps().V1().Deployments().Informer()
 	configMapInformer := factory.Core().V1().ConfigMaps().Informer()
 
 	// 為 Deployment informer 加入事件處理
-	deploymentInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			dep, ok := obj.(*appsv1.Deployment)
-			if !ok {
-				return
-			}
-			// 只關注指定的 deployment 與 namespace
-			if dep.Name == deploymentName && dep.Namespace == deploymentNS {
-				log.Printf("偵測到 Deployment %s/%s 新增，重新產生 DaemonSet", dep.Namespace, dep.Name)
-				reconcileDaemonSets(clientset)
-			}
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			dep, ok := newObj.(*appsv1.Deployment)
-			if !ok {
-				return
-			}
-			if dep.Name == deploymentName && dep.Namespace == deploymentNS {
-				log.Printf("偵測到 Deployment %s/%s 更新，重新產生 DaemonSet", dep.Namespace, dep.Name)
-				reconcileDaemonSets(clientset)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			dep, ok := obj.(*appsv1.Deployment)
-			if !ok {
-				return
-			}
-			if dep.Name == deploymentName && dep.Namespace == deploymentNS {
-				log.Printf("偵測到 Deployment %s/%s 刪除，重新產生 DaemonSet", dep.Namespace, dep.Name)
-				reconcileDaemonSets(clientset)
-			}
-		},
-	})
+	/* 待刪除 */
+	// deploymentInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	// 	AddFunc: func(obj interface{}) {
+	// 		dep, ok := obj.(*appsv1.Deployment)
+	// 		if !ok {
+	// 			return
+	// 		}
+	// 		// 只關注指定的 deployment 與 namespace
+	// 		if dep.Name == deploymentName && dep.Namespace == deploymentNS {
+	// 			log.Printf("偵測到 Deployment %s/%s 新增，重新產生 DaemonSet", dep.Namespace, dep.Name)
+	// 			reconcileDaemonSets(clientset)
+	// 		}
+	// 	},
+	// 	UpdateFunc: func(oldObj, newObj interface{}) {
+	// 		dep, ok := newObj.(*appsv1.Deployment)
+	// 		if !ok {
+	// 			return
+	// 		}
+	// 		if dep.Name == deploymentName && dep.Namespace == deploymentNS {
+	// 			log.Printf("偵測到 Deployment %s/%s 更新，重新產生 DaemonSet", dep.Namespace, dep.Name)
+	// 			reconcileDaemonSets(clientset)
+	// 		}
+	// 	},
+	// 	DeleteFunc: func(obj interface{}) {
+	// 		dep, ok := obj.(*appsv1.Deployment)
+	// 		if !ok {
+	// 			return
+	// 		}
+	// 		if dep.Name == deploymentName && dep.Namespace == deploymentNS {
+	// 			log.Printf("偵測到 Deployment %s/%s 刪除，重新產生 DaemonSet", dep.Namespace, dep.Name)
+	// 			reconcileDaemonSets(clientset)
+	// 		}
+	// 	},
+	// })
 
 	// 為 ConfigMap informer 加入事件處理
 	configMapInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -140,7 +141,7 @@ func main() {
 	factory.Start(stopCh)
 
 	// 等待 cache 同步完成
-	if !cache.WaitForCacheSync(stopCh, deploymentInformer.HasSynced, configMapInformer.HasSynced) {
+	if !cache.WaitForCacheSync(stopCh, configMapInformer.HasSynced) {
 		log.Fatalf("cache 同步失敗")
 	}
 
@@ -235,6 +236,23 @@ func reconcileDaemonSets(clientset *kubernetes.Clientset) {
 								Image: image,
 								// 以 sleep infinite 確保 container 持續執行，從而確保 image 被拉取
 								Command: []string{"sleep", "infinity"},
+							},
+						},
+						Affinity: &corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      "type",
+													Operator: corev1.NodeSelectorOpNotIn,
+													Values:   []string{"remote"},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 						// 若有需要，也可以設定 tolerations，例如 master 節點
