@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qnap-config
+  namespace: kubeflow
+  annotations:
+    description: "ConfigMap for QNAP controller. All values must be base64 encoded."
+data:
+  # Values must be base64 encoded
+  # Example:
+  # echo -n "value" | base64
+  ip: "MTIwLjEyNi4yMy43"        # Base64 encoded IP address
+  username: "cW5hcHVzZXI="       # Base64 encoded username
+  password: "UEBzc3cwcmQ="       # Base64 encoded password
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qnap-controller
+  namespace: kubeflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qnap-controller
+  template:
+    metadata:
+      labels:
+        app: qnap-controller
+    spec:
+      serviceAccountName: qnap-controller-sa
+      containers:
+      - name: qnap-controller
+        image: cguaicadmin/qnap-controller:v1.1
+        imagePullPolicy: IfNotPresent
+        command: ["/qnap-controller"]
+        env:
+        - name: IP
+          valueFrom:
+            configMapKeyRef:
+              name: qnap-config
+              key: ip
+        - name: USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: qnap-config
+              key: username
+        - name: PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: qnap-config
+              key: password
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: "/root/.kube"
+          readOnly: true
+      volumes:
+      - name: kubeconfig
+        hostPath:
+          path: "/root/.kube"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: qnap-controller-sa
+  namespace: kubeflow
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: qnap-controller-role
+  namespace: kubeflow
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["qnap.wycc.dev"]
+  resources: ["profiles"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: qnap-controller-rolebinding
+  namespace: kubeflow
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: qnap-controller-role
+subjects:
+- kind: ServiceAccount
+  name: qnap-controller-sa
+  namespace: kubeflow
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: qnap-controller-clusterrole
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: qnap-controller-clusterrolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: qnap-controller-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: qnap-controller-sa
+  namespace: kubeflow
