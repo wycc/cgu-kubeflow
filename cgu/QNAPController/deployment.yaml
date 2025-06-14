@@ -31,7 +31,7 @@ spec:
       serviceAccountName: qnap-controller-sa
       containers:
       - name: qnap-controller
-        image: cguaicadmin/qnap-controller:v1.1
+        image: cguaicadmin/qnap-controller:v1.5
         imagePullPolicy: IfNotPresent
         command: ["/qnap-controller"]
         env:
