@@ -98,7 +98,7 @@ metadata:
   name: qnap-controller-clusterrole
 rules:
 - apiGroups: [""]
-  resources: ["secrets"]
+  resources: ["secrets","limitranges"]
   verbs: ["create", "get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
