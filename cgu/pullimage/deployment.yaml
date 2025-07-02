@@ -16,5 +16,5 @@ spec:
       serviceAccountName: pullimage-sa
       containers:
         - name: pullimage
-          image: cguaicadmin/pullimage:test2
+          image: cguaicadmin/pullimage:V1.0.0
           imagePullPolicy: Always
