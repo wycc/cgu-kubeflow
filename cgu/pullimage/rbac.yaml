@@ -1,30 +1,36 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: daemonset-watcher-sa
+  name: pullimage-sa
   namespace: pullimage
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: daemonset-watcher-role
+  name: pullimage-role
 rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["apps"]
     resources: ["deployments", "daemonsets"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
     verbs: ["get", "list", "watch", "create", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: daemonset-watcher-binding
+  name: pullimage-binding
 subjects:
   - kind: ServiceAccount
-    name: daemonset-watcher-sa
+    name: pullimage-sa
     namespace: pullimage
 roleRef:
   kind: ClusterRole
-  name: daemonset-watcher-role
+  name: pullimage-role
   apiGroup: rbac.authorization.k8s.io
