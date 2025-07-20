@@ -1,6 +1,6 @@
 # Image URL to use all building/pushing image targets
 IMG ?= notebook-ssh-controller
-VER ?= 1.0
+VER ?= 1.0.2
 # Build the docker image
 .PHONY: docker-build
 docker-build:
