@@ -132,10 +132,10 @@ func (r *NotebookReconciler) newSSHServiceForNotebook(notebook *notebookv1.Noteb
 			Selector: labels,
 			Ports: []corev1.ServicePort{
 				{
+					Name:       "tcp-ssh",
 					Protocol:   corev1.ProtocolTCP,
-					Port:       2222,
-					TargetPort: intstr.FromInt(int(sshPort)), // Use intstr.FromInt for targetPort
-					NodePort:   0,                            // Kubernetes will assign a NodePort
+					Port:       sshPort,
+					TargetPort: intstr.FromInt(int(sshPort)),
 				},
 			},
 			Type: corev1.ServiceTypeNodePort,
