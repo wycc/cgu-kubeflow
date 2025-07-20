@@ -146,6 +146,7 @@ func (r *NotebookReconciler) newSSHServiceForNotebook(notebook *notebookv1.Noteb
 }
 
 // SetupWithManager sets up the controller with the Manager.
+// Please look at OperatorPattern.md for the defails.
 func (r *NotebookReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&notebookv1.Notebook{}).

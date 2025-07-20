@@ -4,12 +4,12 @@ VER ?= 1.0
 # Build the docker image
 .PHONY: docker-build
 docker-build:
-	docker build -t ${IMG}:${VER} .
+	docker build -t cguaicadmin/${IMG}:${VER} .
 
 # Push the docker image
 .PHONY: docker-push
 docker-push:
-	docker push ${IMG}
+	docker push cguaicadmin/${IMG}:${VER}
 
 # Deploy to the cluster
 .PHONY: deploy
