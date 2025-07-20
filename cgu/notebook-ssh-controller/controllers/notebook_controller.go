@@ -97,8 +97,8 @@ func (r *NotebookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Service already exists, check if it needs update
 	needsUpdate := false
 	if len(service.Spec.Ports) > 0 {
-		if service.Spec.Ports[0].Port != sshPort {
-			service.Spec.Ports[0].Port = sshPort
+		if service.Spec.Ports[0].Port != 2222 {
+			service.Spec.Ports[0].Port = 2222
 			service.Spec.Ports[0].TargetPort = intstr.FromInt(int(sshPort))
 			needsUpdate = true
 		}
