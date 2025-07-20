@@ -79,16 +79,17 @@ func (r *NotebookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// SSH port is defined, proceed with Service creation/update
-	if client.IgnoreNotFound(err) != nil {
-		// Service does not exist, create it
-		service = r.newSSHServiceForNotebook(notebook, sshPort)
-		log.Log.Info("Creating a new SSH Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
-		if err := r.Create(ctx, service); err != nil {
-			log.Log.Error(err, "Failed to create new SSH Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
-			return ctrl.Result{}, err
+	if err != nil {
+		if client.IgnoreNotFound(err) == nil {
+			// Service does not exist, create it
+			service = r.newSSHServiceForNotebook(notebook, sshPort)
+			log.Log.Info("Creating a new SSH Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
+			if err := r.Create(ctx, service); err != nil {
+				log.Log.Error(err, "Failed to create new SSH Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{Requeue: true}, nil
 		}
-		return ctrl.Result{Requeue: true}, nil
-	} else if err != nil {
 		log.Log.Error(err, "Failed to get SSH Service")
 		return ctrl.Result{}, err
 	}
