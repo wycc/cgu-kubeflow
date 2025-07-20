@@ -1,0 +1,41 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: notebook-ssh-controller-manager-role
+rules:
+- apiGroups:
+  - kubeflow.org
+  resources:
+  - notebooks
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - kubeflow.org
+  resources:
+  - notebooks/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - kubeflow.org
+  resources:
+  - notebooks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
