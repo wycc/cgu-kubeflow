@@ -118,7 +118,7 @@ func (r *NotebookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 // newSSHServiceForNotebook creates a new Service for a Notebook resource.
 func (r *NotebookReconciler) newSSHServiceForNotebook(notebook *notebookv1.Notebook, sshPort int32) *corev1.Service {
 	labels := map[string]string{
-		"app":           "jupyter",
+		"app":           notebook.Name,
 		"notebook-name": notebook.Name,
 	}
 
