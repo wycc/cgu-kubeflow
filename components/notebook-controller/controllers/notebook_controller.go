@@ -50,6 +50,7 @@ import (
 
 const DefaultContainerPort = 8888
 const DefaultServingPort = 80
+const DefaultTCPPort = 8000
 const AnnotationRewriteURI = "notebooks.kubeflow.org/http-rewrite-uri"
 const AnnotationHeadersRequestSet = "notebooks.kubeflow.org/http-headers-request-set"
 
@@ -86,6 +87,7 @@ type NotebookReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs="*"
 // +kubebuilder:rbac:groups=kubeflow.org,resources=notebooks;notebooks/status;notebooks/finalizers,verbs="*"
 // +kubebuilder:rbac:groups="networking.istio.io",resources=virtualservices,verbs="*"
+// +kubebuilder:rbac:groups="security.istio.io",resources=authorizationpolicies,verbs="*"
 
 func (r *NotebookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("notebook", req.NamespacedName)
@@ -203,6 +205,12 @@ func (r *NotebookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Reconcile virtual service if we use ISTIO.
 	if os.Getenv("USE_ISTIO") == "true" {
 		err = r.reconcileVirtualService(instance)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Reconcile authorization policy for TCP port 8000
+		err = r.reconcileAuthorizationPolicy(instance)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -416,6 +424,11 @@ func generateStatefulSet(instance *v1beta1.Notebook) *appsv1.StatefulSet {
 				Name:          "notebook-port",
 				Protocol:      "TCP",
 			},
+			{
+				ContainerPort: DefaultTCPPort,
+				Name:          "tcp-8000",
+				Protocol:      "TCP",
+			},
 		}
 	}
 
@@ -472,6 +485,13 @@ func generateService(instance *v1beta1.Notebook) *corev1.Service {
 					TargetPort: intstr.FromInt(port),
 					Protocol:   "TCP",
 				},
+				{
+					// TCP port 8000 for inter-pod communication
+					Name:       "tcp-8000-" + instance.Name,
+					Port:       DefaultTCPPort,
+					TargetPort: intstr.FromInt(DefaultTCPPort),
+					Protocol:   "TCP",
+				},
 			},
 		},
 	}
@@ -480,6 +500,10 @@ func generateService(instance *v1beta1.Notebook) *corev1.Service {
 
 func virtualServiceName(kfName string, namespace string) string {
 	return fmt.Sprintf("notebook-%s-%s", namespace, kfName)
+}
+
+func authorizationPolicyName(kfName string, namespace string) string {
+	return fmt.Sprintf("notebook-%s-%s-tcp-8000", namespace, kfName)
 }
 
 func generateVirtualService(instance *v1beta1.Notebook) (*unstructured.Unstructured, error) {
@@ -578,6 +602,51 @@ func generateVirtualService(instance *v1beta1.Notebook) (*unstructured.Unstructu
 
 }
 
+func generateAuthorizationPolicy(instance *v1beta1.Notebook) (*unstructured.Unstructured, error) {
+	name := instance.Name
+	namespace := instance.Namespace
+
+	authzPolicy := &unstructured.Unstructured{}
+	authzPolicy.SetAPIVersion("security.istio.io/v1beta1")
+	authzPolicy.SetKind("AuthorizationPolicy")
+	authzPolicy.SetName(authorizationPolicyName(name, namespace))
+	authzPolicy.SetNamespace(namespace)
+
+	// Set selector to match notebook pods
+	selector := map[string]interface{}{
+		"matchLabels": map[string]interface{}{
+			"statefulset": name,
+		},
+	}
+	if err := unstructured.SetNestedMap(authzPolicy.Object, selector, "spec", "selector"); err != nil {
+		return nil, fmt.Errorf("set .spec.selector error: %v", err)
+	}
+
+	// Set ALLOW action
+	if err := unstructured.SetNestedField(authzPolicy.Object, "ALLOW", "spec", "action"); err != nil {
+		return nil, fmt.Errorf("set .spec.action error: %v", err)
+	}
+
+	// Set rules to allow port 8000 access from entire cluster
+	rules := []interface{}{
+		map[string]interface{}{
+			"to": []interface{}{
+				map[string]interface{}{
+					"operation": map[string]interface{}{
+						"ports": []interface{}{"8000"},
+					},
+				},
+			},
+		},
+	}
+
+	if err := unstructured.SetNestedSlice(authzPolicy.Object, rules, "spec", "rules"); err != nil {
+		return nil, fmt.Errorf("set .spec.rules error: %v", err)
+	}
+
+	return authzPolicy, nil
+}
+
 func (r *NotebookReconciler) reconcileVirtualService(instance *v1beta1.Notebook) error {
 	log := r.Log.WithValues("notebook", instance.Namespace)
 	virtualService, err := generateVirtualService(instance)
@@ -611,6 +680,48 @@ func (r *NotebookReconciler) reconcileVirtualService(instance *v1beta1.Notebook)
 		log.Info("Updating virtual service", "namespace", instance.Namespace, "name",
 			virtualServiceName(instance.Name, instance.Namespace))
 		err = r.Update(context.TODO(), foundVirtual)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *NotebookReconciler) reconcileAuthorizationPolicy(instance *v1beta1.Notebook) error {
+	log := r.Log.WithValues("notebook", instance.Namespace)
+	authorizationPolicy, err := generateAuthorizationPolicy(instance)
+	if err != nil {
+		log.Info("Unable to generate AuthorizationPolicy...", err)
+		return err
+	}
+	if err := ctrl.SetControllerReference(instance, authorizationPolicy, r.Scheme); err != nil {
+		return err
+	}
+	// Check if the authorization policy already exists.
+	foundAuthzPolicy := &unstructured.Unstructured{}
+	justCreated := false
+	foundAuthzPolicy.SetAPIVersion("security.istio.io/v1beta1")
+	foundAuthzPolicy.SetKind("AuthorizationPolicy")
+	err = r.Get(context.TODO(), types.NamespacedName{Name: authorizationPolicyName(instance.Name,
+		instance.Namespace), Namespace: instance.Namespace}, foundAuthzPolicy)
+	if err != nil && apierrs.IsNotFound(err) {
+		log.Info("Creating authorization policy", "namespace", instance.Namespace, "name",
+			authorizationPolicyName(instance.Name, instance.Namespace))
+		err = r.Create(context.TODO(), authorizationPolicy)
+		justCreated = true
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+
+	if !justCreated && !reflect.DeepEqual(authorizationPolicy.Object["spec"], foundAuthzPolicy.Object["spec"]) {
+		log.Info("Updating authorization policy", "namespace", instance.Namespace, "name",
+			authorizationPolicyName(instance.Name, instance.Namespace))
+		foundAuthzPolicy.Object["spec"] = authorizationPolicy.Object["spec"]
+		err = r.Update(context.TODO(), foundAuthzPolicy)
 		if err != nil {
 			return err
 		}
@@ -730,12 +841,17 @@ func (r *NotebookReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &corev1.Event{}},
 			handler.EnqueueRequestsFromMapFunc(mapEventToRequest),
 			builder.WithPredicates(predNBEvents(r)))
-	// watch Istio virtual service
+	// watch Istio virtual service and authorization policy
 	if os.Getenv("USE_ISTIO") == "true" {
 		virtualService := &unstructured.Unstructured{}
 		virtualService.SetAPIVersion("networking.istio.io/v1alpha3")
 		virtualService.SetKind("VirtualService")
 		builder.Owns(virtualService)
+
+		authorizationPolicy := &unstructured.Unstructured{}
+		authorizationPolicy.SetAPIVersion("security.istio.io/v1beta1")
+		authorizationPolicy.SetKind("AuthorizationPolicy")
+		builder.Owns(authorizationPolicy)
 	}
 
 	err := builder.Complete(r)
