@@ -580,7 +580,7 @@ func generateVirtualService(instance *v1beta1.Notebook) (*unstructured.Unstructu
 			"rewrite": map[string]interface{}{
 				"uri": rewrite,
 			},
-			"name": fmt.Sprintf("notebook-%s-%s", namespace, name),
+			"name": fmt.Sprintf("notebook-%s-%s-prefix", namespace, name),
 			"route": []interface{}{
 				map[string]interface{}{
 					"destination": map[string]interface{}{
