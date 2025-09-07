@@ -634,7 +634,7 @@ func generateAuthorizationPolicy(instance *v1beta1.Notebook) (*unstructured.Unst
 			"to": []interface{}{
 				map[string]interface{}{
 					"operation": map[string]interface{}{
-						"ports": []interface{}{"8000", "8080"},
+						"ports": []interface{}{"8000", "80"},
 					},
 				},
 			},
