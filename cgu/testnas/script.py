@@ -145,7 +145,12 @@ files = requests.get(list_url).json().get("datas", [])
 filenames = [f["filename"] for f in files]
 
 # 5) 執行檔案複製並追蹤進度
-total = len(filenames)
+
+os.system(f"find /source -type d -name '.*' > /tmp/list.txt")
+with open("/tmp/list.txt", "r") as f:
+    hidden_dirs = [d for d in f.read().splitlines() if d]
+
+total = len(filenames) + len(hidden_dirs)
 for idx, fname in enumerate(filenames):
     print(f"開始複製文件: {fname}")
     copy_url = (
@@ -163,9 +168,7 @@ for idx, fname in enumerate(filenames):
     time.sleep(1)
 
 # 6) 複製隱藏目錄 (.開頭)
-os.system(f"find /source -type d -name '.*' > /tmp/list.txt")
-with open("/tmp/list.txt", "r") as f:
-    hidden_dirs = [d for d in f.read().splitlines() if d]
+
 
 for d in hidden_dirs:
     ff=d.split('/')
