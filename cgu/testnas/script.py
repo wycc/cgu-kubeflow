@@ -6,6 +6,7 @@ import json
 import time
 import pprint
 import kubernetes
+import math
 import stat, shlex, subprocess
 from kubernetes.client.rest import ApiException
 
@@ -100,7 +101,7 @@ def track_copy_progress(filename, pid, start, amount):
 
                 # —— 新增：重建 current_clone_progress_is_{prog} 目錄
                 #    先移除舊的，再用最新的 prog（取整數）當名稱
-                os.system(f"cd /home/jovyan/ ; rm -rf current_clone_progress_is_*; mkdir current_clone_progress_is_{int(prog)}")
+                os.system(f"cd /home/jovyan/ ; rm -rf clone_*%; mkdir current_clone_progress_is_{math.round(prog)}")
 
                 # 印出進度
                 print(f"\r複製中 `{filename}` - {prog:5.1f}% ", end="")
