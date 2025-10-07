@@ -47,5 +47,6 @@ rules:
   - networking.istio.io
   resources:
   - virtualservices
+  - envoyfilters
   verbs:
   - '*'
