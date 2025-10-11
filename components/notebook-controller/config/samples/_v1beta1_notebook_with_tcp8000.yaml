@@ -1,0 +1,38 @@
+---
+apiVersion: kubeflow.org/v1beta1
+kind: Notebook
+metadata:
+  name: notebook-tcp8000-sample
+  namespace: kubeflow-user-example-com
+  annotations:
+    notebooks.kubeflow.org/enable-tcp-8000: "true"
+spec:
+  template:
+    spec:
+      containers:
+        - name: notebook-tcp8000-sample
+          image: kubeflownotebookswg/jupyter:latest
+          ports:
+            - containerPort: 8888
+              name: notebook-port
+              protocol: TCP
+            - containerPort: 8000
+              name: tcp-8000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "0.5"
+              memory: "1.0Gi"
+            limits:
+              cpu: "1.0"
+              memory: "2.0Gi"
+          env:
+            - name: NB_PREFIX
+              value: /notebook/kubeflow-user-example-com/notebook-tcp8000-sample
+          volumeMounts:
+            - name: workspace-notebook-tcp8000-sample
+              mountPath: /home/jovyan
+      volumes:
+        - name: workspace-notebook-tcp8000-sample
+          persistentVolumeClaim:
+            claimName: workspace-notebook-tcp8000-sample

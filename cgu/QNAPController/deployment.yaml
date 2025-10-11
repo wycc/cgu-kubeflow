@@ -74,7 +74,7 @@ rules:
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["get", "list", "watch"]
-- apiGroups: ["qnap.wycc.dev"]
+- apiGroups: ["kubeflow.org"]
   resources: ["profiles"]
   verbs: ["get", "list", "watch"]
 ---
