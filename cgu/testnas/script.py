@@ -275,3 +275,5 @@ for d in hidden_dirs:
     time.sleep(1)
 
 print("所有檔案與隱藏目錄複製完成。")
+prog=100
+os.system(f"cd /home/jovyan/ ; rm -rf clone_* Desktop/clone_*; mkdir clone_{round(prog)}%% Desktop/clone_{round(prog)}%%")
