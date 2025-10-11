@@ -1,4 +1,4 @@
-VER=v0.1.15
+VER=v0.1.16
 
 all:
 	echo "build | push"

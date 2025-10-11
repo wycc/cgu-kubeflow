@@ -101,7 +101,7 @@ def track_copy_progress(filename, pid, start, amount):
 
                 # —— 新增：重建 current_clone_progress_is_{prog} 目錄
                 #    先移除舊的，再用最新的 prog（取整數）當名稱
-                os.system(f"cd /home/jovyan/ ; rm -rf clone_* Desktop/clone_*; mkdir clone_{round(prog)}%% Desktop/clone_{round(prog)}%%")
+                os.system(f"cd /home/jovyan/ ; rm -rf clone_* Desktop/clone_*; mkdir clone_{round(prog)}% Desktop/clone_{round(prog)}%")
 
                 # 印出進度
                 print(f"\r複製中 `{filename}` - {prog:5.1f}% ", end="")
@@ -276,4 +276,4 @@ for d in hidden_dirs:
 
 print("所有檔案與隱藏目錄複製完成。")
 prog=100
-os.system(f"cd /home/jovyan/ ; rm -rf clone_* Desktop/clone_*; mkdir clone_{round(prog)}%% Desktop/clone_{round(prog)}%%")
+os.system(f"cd /home/jovyan/ ; rm -rf clone_* Desktop/clone_*; mkdir clone_{round(prog)}% Desktop/clone_{round(prog)}%")
