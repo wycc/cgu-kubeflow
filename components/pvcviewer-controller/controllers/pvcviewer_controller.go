@@ -52,12 +52,20 @@ const (
 	partOfLabelKey   = "app.kubernetes.io/part-of"
 	partOfLabelValue = "pvc-viewer"
 
-	servicePort         = int32(80)
 	istioGatewayEnvKey  = "ISTIO_GATEWAY"
 	defaultIstioGateway = "kubeflow/kubeflow-gateway"
+
+	// Finalizer for public share resources cleanup
+	publicShareFinalizer = "pvcviewer.kubeflow.org/public-share-cleanup"
+
+	// Labels for tracking istio-system resources
+	pvcviewerNameLabelKey      = "pvcviewer.kubeflow.org/name"
+	pvcviewerNamespaceLabelKey = "pvcviewer.kubeflow.org/namespace"
 )
 
 var (
+	servicePort = int32(80)
+
 	virtualServiceTemplate = &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "networking.istio.io/v1alpha3",
@@ -79,6 +87,10 @@ var (
 // Add permissions to read external resources
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch
+
+// Public share resources - EnvoyFilter and AuthorizationPolicy
+// +kubebuilder:rbac:groups=networking.istio.io,resources=envoyfilters,verbs=get;list;watch;create;update;delete
+// +kubebuilder:rbac:groups=security.istio.io,resources=authorizationpolicies,verbs=get;list;watch;create;update;delete
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PVCViewerReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -104,16 +116,43 @@ func (r *PVCViewerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	if !instance.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is being deleted
-		// Do nothing as the resources are automatically garbage collected
 		log.Info("PVCViewer is being deleted")
 
-		// Keep on reconciling status until the finalizer is removed
+		// Handle finalizer cleanup for istio-system resources
+		if containsString(instance.Finalizers, publicShareFinalizer) {
+			log.Info("Cleaning up public share resources in istio-system")
+			if err := r.cleanupIstioSystemResources(ctx, log, instance); err != nil {
+				log.Error(err, "Failed to cleanup istio-system resources")
+				return ctrl.Result{}, err
+			}
+
+			// Remove finalizer
+			instance.Finalizers = removeString(instance.Finalizers, publicShareFinalizer)
+			if err := r.Update(ctx, instance); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
+		// Keep on reconciling status until all finalizers are removed
 		if err := r.reconcileStatus(ctx, log, instance.Name, instance.Namespace); err != nil {
 			log.Error(err, "Error while reconciling status")
 			return ctrl.Result{}, err
 		}
 
 		return reconcile.Result{}, nil
+	}
+
+	// Ensure finalizer is present when Networking is configured
+	if instance.Spec.Networking != (kubefloworgv1alpha1.Networking{}) {
+		if !containsString(instance.Finalizers, publicShareFinalizer) {
+			log.Info("Adding public share finalizer")
+			instance.Finalizers = append(instance.Finalizers, publicShareFinalizer)
+			if err := r.Update(ctx, instance); err != nil {
+				return ctrl.Result{}, err
+			}
+			// Requeue to continue processing
+			return ctrl.Result{Requeue: true}, nil
+		}
 	}
 
 	commonLabels := map[string]string{
@@ -134,6 +173,12 @@ func (r *PVCViewerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	if err := r.reconcileVirtualService(ctx, log, instance, commonLabels); err != nil {
 		log.Error(err, "Error while reconciling virtual service")
+		return ctrl.Result{}, err
+	}
+
+	// Reconcile public share resources
+	if err := r.reconcilePublicShareResources(ctx, log, instance, commonLabels); err != nil {
+		log.Error(err, "Error while reconciling public share resources")
 		return ctrl.Result{}, err
 	}
 
@@ -442,4 +487,373 @@ func (r *PVCViewerReconciler) generateAffinity(ctx context.Context, log logr.Log
 		},
 	}
 	return affinity, nil
+}
+
+// reconcilePublicShareResources creates and manages public share resources when Networking is configured
+func (r *PVCViewerReconciler) reconcilePublicShareResources(
+	ctx context.Context,
+	log logr.Logger,
+	viewer *kubefloworgv1alpha1.PVCViewer,
+	commonLabels map[string]string,
+) error {
+	// Only create public share resources when Networking is configured
+	if viewer.Spec.Networking == (kubefloworgv1alpha1.Networking{}) {
+		log.Info("Skipping public share resources: Networking not configured")
+		return nil
+	}
+
+	// Reconcile each resource
+	if err := r.reconcileShareVirtualService(ctx, log, viewer, commonLabels); err != nil {
+		return fmt.Errorf("failed to reconcile share VirtualService: %w", err)
+	}
+
+	if err := r.reconcileShareEnvoyFilter(ctx, log, viewer); err != nil {
+		return fmt.Errorf("failed to reconcile share EnvoyFilter: %w", err)
+	}
+
+	if err := r.reconcileShareAuthPolicyGateway(ctx, log, viewer); err != nil {
+		return fmt.Errorf("failed to reconcile share AuthorizationPolicy (Gateway): %w", err)
+	}
+
+	if err := r.reconcileShareAuthPolicyBackend(ctx, log, viewer, commonLabels); err != nil {
+		return fmt.Errorf("failed to reconcile share AuthorizationPolicy (Backend): %w", err)
+	}
+
+	return nil
+}
+
+// reconcileShareVirtualService creates or updates the VirtualService for public share access
+func (r *PVCViewerReconciler) reconcileShareVirtualService(
+	ctx context.Context,
+	log logr.Logger,
+	viewer *kubefloworgv1alpha1.PVCViewer,
+	commonLabels map[string]string,
+) error {
+	vsName := fmt.Sprintf("pvcviewer-share-%s", viewer.Name)
+	routeName := fmt.Sprintf("pvcviewer-%s-%s-share-public", viewer.Namespace, viewer.Name)
+	sharePath := fmt.Sprintf("%s/%s/%s/share/",
+		viewer.Spec.Networking.BasePrefix,
+		viewer.Namespace,
+		viewer.Name)
+
+	// Get the istio gateway from the environment variable or use the default
+	istioGateway := os.Getenv(istioGatewayEnvKey)
+	if istioGateway == "" {
+		istioGateway = defaultIstioGateway
+	}
+
+	vs := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "networking.istio.io/v1beta1",
+			"kind":       "VirtualService",
+			"metadata": map[string]interface{}{
+				"name":      vsName,
+				"namespace": viewer.Namespace,
+				"labels":    commonLabels,
+			},
+			"spec": map[string]interface{}{
+				"hosts":    []string{"*"},
+				"gateways": []string{istioGateway},
+				"http": []interface{}{
+					map[string]interface{}{
+						"name": routeName,
+						"match": []interface{}{
+							map[string]interface{}{
+								"uri": map[string]interface{}{
+									"prefix": sharePath,
+								},
+							},
+						},
+						"route": []interface{}{
+							map[string]interface{}{
+								"destination": map[string]interface{}{
+									"host": fmt.Sprintf("%s%s.%s.svc.cluster.local",
+										resourcePrefix, viewer.Name, viewer.Namespace),
+									"port": map[string]interface{}{
+										"number": int64(servicePort),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(viewer, vs, r.Scheme); err != nil {
+		return err
+	}
+
+	return r.createOrUpdateUnstructured(ctx, log, vs, "Share VirtualService")
+}
+
+// reconcileShareEnvoyFilter creates or updates the EnvoyFilter to bypass authentication
+func (r *PVCViewerReconciler) reconcileShareEnvoyFilter(
+	ctx context.Context,
+	log logr.Logger,
+	viewer *kubefloworgv1alpha1.PVCViewer,
+) error {
+	efName := fmt.Sprintf("bypass-auth-pvcviewer-share-%s-%s",
+		viewer.Namespace, viewer.Name)
+	routeName := fmt.Sprintf("pvcviewer-%s-%s-share-public",
+		viewer.Namespace, viewer.Name)
+
+	ef := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "networking.istio.io/v1alpha3",
+			"kind":       "EnvoyFilter",
+			"metadata": map[string]interface{}{
+				"name":      efName,
+				"namespace": "istio-system",
+				"labels": map[string]string{
+					pvcviewerNameLabelKey:      viewer.Name,
+					pvcviewerNamespaceLabelKey: viewer.Namespace,
+				},
+			},
+			"spec": map[string]interface{}{
+				"workloadSelector": map[string]interface{}{
+					"labels": map[string]interface{}{
+						"istio": "ingressgateway",
+					},
+				},
+				"configPatches": []interface{}{
+					// HTTP port 8080
+					createEnvoyFilterPatch(routeName, "*:8080"),
+					// HTTPS port 443
+					createEnvoyFilterPatch(routeName, "*:443"),
+				},
+			},
+		},
+	}
+
+	// Note: EnvoyFilter in istio-system cannot use cross-namespace OwnerReference
+	return r.createOrUpdateUnstructured(ctx, log, ef, "Share EnvoyFilter")
+}
+
+// createEnvoyFilterPatch creates a config patch for EnvoyFilter
+func createEnvoyFilterPatch(routeName, vhostName string) map[string]interface{} {
+	return map[string]interface{}{
+		"applyTo": "HTTP_ROUTE",
+		"match": map[string]interface{}{
+			"context": "GATEWAY",
+			"routeConfiguration": map[string]interface{}{
+				"vhost": map[string]interface{}{
+					"name": vhostName,
+					"route": map[string]interface{}{
+						"name": routeName,
+					},
+				},
+			},
+		},
+		"patch": map[string]interface{}{
+			"operation": "MERGE",
+			"value": map[string]interface{}{
+				"typed_per_filter_config": map[string]interface{}{
+					"envoy.filters.http.ext_authz": map[string]interface{}{
+						"@type":    "type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute",
+						"disabled": true,
+					},
+				},
+			},
+		},
+	}
+}
+
+// reconcileShareAuthPolicyGateway creates or updates the Gateway AuthorizationPolicy
+func (r *PVCViewerReconciler) reconcileShareAuthPolicyGateway(
+	ctx context.Context,
+	log logr.Logger,
+	viewer *kubefloworgv1alpha1.PVCViewer,
+) error {
+	apName := fmt.Sprintf("allow-pvcviewer-share-%s-%s-gw",
+		viewer.Namespace, viewer.Name)
+	sharePath := fmt.Sprintf("%s/%s/%s/share/*",
+		viewer.Spec.Networking.BasePrefix,
+		viewer.Namespace,
+		viewer.Name)
+
+	ap := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "security.istio.io/v1",
+			"kind":       "AuthorizationPolicy",
+			"metadata": map[string]interface{}{
+				"name":      apName,
+				"namespace": "istio-system",
+				"labels": map[string]string{
+					pvcviewerNameLabelKey:      viewer.Name,
+					pvcviewerNamespaceLabelKey: viewer.Namespace,
+				},
+			},
+			"spec": map[string]interface{}{
+				"selector": map[string]interface{}{
+					"matchLabels": map[string]interface{}{
+						"istio": "ingressgateway",
+					},
+				},
+				"action": "ALLOW",
+				"rules": []interface{}{
+					map[string]interface{}{
+						"to": []interface{}{
+							map[string]interface{}{
+								"operation": map[string]interface{}{
+									"paths": []string{sharePath},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return r.createOrUpdateUnstructured(ctx, log, ap, "Share AuthorizationPolicy (Gateway)")
+}
+
+// reconcileShareAuthPolicyBackend creates or updates the Backend AuthorizationPolicy
+func (r *PVCViewerReconciler) reconcileShareAuthPolicyBackend(
+	ctx context.Context,
+	log logr.Logger,
+	viewer *kubefloworgv1alpha1.PVCViewer,
+	commonLabels map[string]string,
+) error {
+	apName := fmt.Sprintf("allow-pvcviewer-share-%s-inbound", viewer.Name)
+
+	// Fixed allowed HTTP methods (read-only operations)
+	methods := []string{"GET", "HEAD", "OPTIONS"}
+
+	// Path configuration: need to match both external and internal paths
+	externalPath := fmt.Sprintf("%s/%s/%s/share/*",
+		viewer.Spec.Networking.BasePrefix,
+		viewer.Namespace,
+		viewer.Name)
+	internalPath := "/share/*"
+
+	ap := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "security.istio.io/v1",
+			"kind":       "AuthorizationPolicy",
+			"metadata": map[string]interface{}{
+				"name":      apName,
+				"namespace": viewer.Namespace,
+				"labels":    commonLabels,
+			},
+			"spec": map[string]interface{}{
+				"selector": map[string]interface{}{
+					"matchLabels": map[string]interface{}{
+						instanceLabelKey: resourcePrefix + viewer.Name,
+					},
+				},
+				"action": "ALLOW",
+				"rules": []interface{}{
+					map[string]interface{}{
+						"to": []interface{}{
+							map[string]interface{}{
+								"operation": map[string]interface{}{
+									"methods": methods,
+									"paths":   []string{externalPath, internalPath},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(viewer, ap, r.Scheme); err != nil {
+		return err
+	}
+
+	return r.createOrUpdateUnstructured(ctx, log, ap, "Share AuthorizationPolicy (Backend)")
+}
+
+// createOrUpdateUnstructured creates or updates an unstructured resource
+func (r *PVCViewerReconciler) createOrUpdateUnstructured(
+	ctx context.Context,
+	log logr.Logger,
+	obj *unstructured.Unstructured,
+	resourceType string,
+) error {
+	existing := &unstructured.Unstructured{}
+	existing.SetGroupVersionKind(obj.GroupVersionKind())
+
+	err := r.Get(ctx, types.NamespacedName{
+		Name:      obj.GetName(),
+		Namespace: obj.GetNamespace(),
+	}, existing)
+
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			log.Info(fmt.Sprintf("Creating %s", resourceType),
+				"name", obj.GetName(),
+				"namespace", obj.GetNamespace())
+			return r.Create(ctx, obj)
+		}
+		return err
+	}
+
+	// Update resource
+	obj.SetResourceVersion(existing.GetResourceVersion())
+	log.Info(fmt.Sprintf("Updating %s", resourceType),
+		"name", obj.GetName(),
+		"namespace", obj.GetNamespace())
+	return r.Update(ctx, obj)
+}
+
+// cleanupIstioSystemResources removes public share resources from istio-system namespace
+func (r *PVCViewerReconciler) cleanupIstioSystemResources(
+	ctx context.Context,
+	log logr.Logger,
+	viewer *kubefloworgv1alpha1.PVCViewer,
+) error {
+	// Delete EnvoyFilter
+	efName := fmt.Sprintf("bypass-auth-pvcviewer-share-%s-%s",
+		viewer.Namespace, viewer.Name)
+	ef := &unstructured.Unstructured{}
+	ef.SetAPIVersion("networking.istio.io/v1alpha3")
+	ef.SetKind("EnvoyFilter")
+	ef.SetName(efName)
+	ef.SetNamespace("istio-system")
+	if err := r.Delete(ctx, ef); err != nil && !apierrs.IsNotFound(err) {
+		log.Error(err, "Failed to delete EnvoyFilter", "name", efName)
+		return err
+	}
+
+	// Delete Gateway AuthorizationPolicy
+	apName := fmt.Sprintf("allow-pvcviewer-share-%s-%s-gw",
+		viewer.Namespace, viewer.Name)
+	ap := &unstructured.Unstructured{}
+	ap.SetAPIVersion("security.istio.io/v1")
+	ap.SetKind("AuthorizationPolicy")
+	ap.SetName(apName)
+	ap.SetNamespace("istio-system")
+	if err := r.Delete(ctx, ap); err != nil && !apierrs.IsNotFound(err) {
+		log.Error(err, "Failed to delete AuthorizationPolicy (Gateway)", "name", apName)
+		return err
+	}
+
+	log.Info("Successfully cleaned up istio-system resources")
+	return nil
+}
+
+// containsString checks if a string is present in a slice
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+// removeString removes a string from a slice
+func removeString(slice []string, s string) []string {
+	result := []string{}
+	for _, item := range slice {
+		if item != s {
+			result = append(result, item)
+		}
+	}
+	return result
 }

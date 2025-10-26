@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,6 +50,7 @@ import (
 
 const DefaultContainerPort = 8888
 const DefaultServingPort = 80
+const DefaultTCPPort = 8000
 const AnnotationRewriteURI = "notebooks.kubeflow.org/http-rewrite-uri"
 const AnnotationHeadersRequestSet = "notebooks.kubeflow.org/http-headers-request-set"
 
@@ -85,6 +87,8 @@ type NotebookReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs="*"
 // +kubebuilder:rbac:groups=kubeflow.org,resources=notebooks;notebooks/status;notebooks/finalizers,verbs="*"
 // +kubebuilder:rbac:groups="networking.istio.io",resources=virtualservices,verbs="*"
+// +kubebuilder:rbac:groups="networking.istio.io",resources=envoyfilters,verbs="*"
+// +kubebuilder:rbac:groups="security.istio.io",resources=authorizationpolicies,verbs="*"
 
 func (r *NotebookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("notebook", req.NamespacedName)
@@ -202,6 +206,18 @@ func (r *NotebookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Reconcile virtual service if we use ISTIO.
 	if os.Getenv("USE_ISTIO") == "true" {
 		err = r.reconcileVirtualService(instance)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Reconcile authorization policy for TCP port 8000
+		err = r.reconcileAuthorizationPolicy(instance)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Reconcile EnvoyFilter for external access
+		err = r.reconcileEnvoyFilter(instance)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -415,6 +431,11 @@ func generateStatefulSet(instance *v1beta1.Notebook) *appsv1.StatefulSet {
 				Name:          "notebook-port",
 				Protocol:      "TCP",
 			},
+			{
+				ContainerPort: DefaultTCPPort,
+				Name:          "tcp-8000",
+				Protocol:      "TCP",
+			},
 		}
 	}
 
@@ -432,6 +453,19 @@ func generateStatefulSet(instance *v1beta1.Notebook) *appsv1.StatefulSet {
 			}
 		}
 	}
+	// Adjust CPU requests to be half of the original value
+	for i := range podSpec.Containers {
+		container := &podSpec.Containers[i]
+		if container.Resources.Requests != nil {
+			if cpuRequest, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+				// Halve the CPU request
+				halfCPU := cpuRequest.DeepCopy()
+				halfCPU.SetScaled(halfCPU.ScaledValue(resource.Milli)/2, resource.Milli)
+				container.Resources.Requests[corev1.ResourceCPU] = halfCPU
+			}
+		}
+	}
+
 	return ss
 }
 
@@ -458,6 +492,13 @@ func generateService(instance *v1beta1.Notebook) *corev1.Service {
 					TargetPort: intstr.FromInt(port),
 					Protocol:   "TCP",
 				},
+				{
+					// TCP port 8000 for inter-pod communication
+					Name:       "tcp-8000-" + instance.Name,
+					Port:       DefaultTCPPort,
+					TargetPort: intstr.FromInt(DefaultTCPPort),
+					Protocol:   "TCP",
+				},
 			},
 		},
 	}
@@ -466,6 +507,14 @@ func generateService(instance *v1beta1.Notebook) *corev1.Service {
 
 func virtualServiceName(kfName string, namespace string) string {
 	return fmt.Sprintf("notebook-%s-%s", namespace, kfName)
+}
+
+func authorizationPolicyName(kfName string, namespace string) string {
+	return fmt.Sprintf("notebook-%s-%s-tcp-8000", namespace, kfName)
+}
+
+func envoyFilterName(kfName string, namespace string) string {
+	return fmt.Sprintf("bypass-auth-%s-%s-notebook", namespace, kfName)
 }
 
 func generateVirtualService(instance *v1beta1.Notebook) (*unstructured.Unstructured, error) {
@@ -542,6 +591,7 @@ func generateVirtualService(instance *v1beta1.Notebook) (*unstructured.Unstructu
 			"rewrite": map[string]interface{}{
 				"uri": rewrite,
 			},
+			"name": fmt.Sprintf("notebook-%s-%s-prefix", namespace, name),
 			"route": []interface{}{
 				map[string]interface{}{
 					"destination": map[string]interface{}{
@@ -562,6 +612,108 @@ func generateVirtualService(instance *v1beta1.Notebook) (*unstructured.Unstructu
 
 	return vsvc, nil
 
+}
+
+func generateAuthorizationPolicy(instance *v1beta1.Notebook) (*unstructured.Unstructured, error) {
+	name := instance.Name
+	namespace := instance.Namespace
+
+	authzPolicy := &unstructured.Unstructured{}
+	authzPolicy.SetAPIVersion("security.istio.io/v1beta1")
+	authzPolicy.SetKind("AuthorizationPolicy")
+	authzPolicy.SetName(authorizationPolicyName(name, namespace))
+	authzPolicy.SetNamespace(namespace)
+
+	// Set selector to match notebook pods
+	selector := map[string]interface{}{
+		"matchLabels": map[string]interface{}{
+			"statefulset": name,
+		},
+	}
+	if err := unstructured.SetNestedMap(authzPolicy.Object, selector, "spec", "selector"); err != nil {
+		return nil, fmt.Errorf("set .spec.selector error: %v", err)
+	}
+
+	// Set ALLOW action
+	if err := unstructured.SetNestedField(authzPolicy.Object, "ALLOW", "spec", "action"); err != nil {
+		return nil, fmt.Errorf("set .spec.action error: %v", err)
+	}
+
+	// Set rules to allow port 8000 access from entire cluster
+	rules := []interface{}{
+		map[string]interface{}{
+			"to": []interface{}{
+				map[string]interface{}{
+					"operation": map[string]interface{}{
+						"ports": []interface{}{"8000", "8888"},
+					},
+				},
+			},
+		},
+	}
+
+	if err := unstructured.SetNestedSlice(authzPolicy.Object, rules, "spec", "rules"); err != nil {
+		return nil, fmt.Errorf("set .spec.rules error: %v", err)
+	}
+
+	return authzPolicy, nil
+}
+
+func generateEnvoyFilter(instance *v1beta1.Notebook) (*unstructured.Unstructured, error) {
+	name := instance.Name
+	namespace := instance.Namespace
+
+	envoyFilter := &unstructured.Unstructured{}
+	envoyFilter.SetAPIVersion("networking.istio.io/v1alpha3")
+	envoyFilter.SetKind("EnvoyFilter")
+	envoyFilter.SetName(envoyFilterName(name, namespace))
+	envoyFilter.SetNamespace("istio-system")
+
+	// Set workloadSelector to target istio ingressgateway
+	workloadSelector := map[string]interface{}{
+		"labels": map[string]interface{}{
+			"istio": "ingressgateway",
+		},
+	}
+	if err := unstructured.SetNestedMap(envoyFilter.Object, workloadSelector, "spec", "workloadSelector"); err != nil {
+		return nil, fmt.Errorf("set .spec.workloadSelector error: %v", err)
+	}
+
+	// Set configPatches to disable ExtAuthz for this notebook
+	routeName := fmt.Sprintf("notebook-%s-%s-prefix", namespace, name)
+	configPatches := []interface{}{
+		map[string]interface{}{
+			"applyTo": "HTTP_ROUTE",
+			"match": map[string]interface{}{
+				"context": "GATEWAY",
+				"routeConfiguration": map[string]interface{}{
+					"vhost": map[string]interface{}{
+						"name": "*:8080",
+						"route": map[string]interface{}{
+							"name": routeName,
+						},
+					},
+				},
+			},
+			"patch": map[string]interface{}{
+				"operation": "MERGE",
+				"value": map[string]interface{}{
+					"typed_per_filter_config": map[string]interface{}{
+						"envoy.filters.http.ext_authz": map[string]interface{}{
+							"@type":    "type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute",
+							"disabled": true,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := unstructured.SetNestedSlice(envoyFilter.Object, configPatches, "spec", "configPatches"); err != nil {
+		return nil, fmt.Errorf("set .spec.configPatches error: %v", err)
+	}
+
+	return envoyFilter, nil
 }
 
 func (r *NotebookReconciler) reconcileVirtualService(instance *v1beta1.Notebook) error {
@@ -597,6 +749,122 @@ func (r *NotebookReconciler) reconcileVirtualService(instance *v1beta1.Notebook)
 		log.Info("Updating virtual service", "namespace", instance.Namespace, "name",
 			virtualServiceName(instance.Name, instance.Namespace))
 		err = r.Update(context.TODO(), foundVirtual)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *NotebookReconciler) reconcileAuthorizationPolicy(instance *v1beta1.Notebook) error {
+	log := r.Log.WithValues("notebook", instance.Namespace)
+	authorizationPolicy, err := generateAuthorizationPolicy(instance)
+	if err != nil {
+		log.Info("Unable to generate AuthorizationPolicy...", err)
+		return err
+	}
+	if err := ctrl.SetControllerReference(instance, authorizationPolicy, r.Scheme); err != nil {
+		return err
+	}
+	// Check if the authorization policy already exists.
+	foundAuthzPolicy := &unstructured.Unstructured{}
+	justCreated := false
+	foundAuthzPolicy.SetAPIVersion("security.istio.io/v1beta1")
+	foundAuthzPolicy.SetKind("AuthorizationPolicy")
+	err = r.Get(context.TODO(), types.NamespacedName{Name: authorizationPolicyName(instance.Name,
+		instance.Namespace), Namespace: instance.Namespace}, foundAuthzPolicy)
+	if err != nil && apierrs.IsNotFound(err) {
+		log.Info("Creating authorization policy", "namespace", instance.Namespace, "name",
+			authorizationPolicyName(instance.Name, instance.Namespace))
+		err = r.Create(context.TODO(), authorizationPolicy)
+		justCreated = true
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+
+	if !justCreated && !reflect.DeepEqual(authorizationPolicy.Object["spec"], foundAuthzPolicy.Object["spec"]) {
+		log.Info("Updating authorization policy", "namespace", instance.Namespace, "name",
+			authorizationPolicyName(instance.Name, instance.Namespace))
+		foundAuthzPolicy.Object["spec"] = authorizationPolicy.Object["spec"]
+		err = r.Update(context.TODO(), foundAuthzPolicy)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *NotebookReconciler) reconcileEnvoyFilter(instance *v1beta1.Notebook) error {
+	log := r.Log.WithValues("notebook", instance.Namespace)
+
+	// Check if externalAccess label exists
+	if _, hasExternalAccess := instance.Labels["externalAccess"]; !hasExternalAccess {
+		// If externalAccess label doesn't exist, check if EnvoyFilter exists and delete it
+		foundEnvoyFilter := &unstructured.Unstructured{}
+		foundEnvoyFilter.SetAPIVersion("networking.istio.io/v1alpha3")
+		foundEnvoyFilter.SetKind("EnvoyFilter")
+		err := r.Get(context.TODO(), types.NamespacedName{
+			Name:      envoyFilterName(instance.Name, instance.Namespace),
+			Namespace: "istio-system",
+		}, foundEnvoyFilter)
+
+		if err == nil {
+			// EnvoyFilter exists, delete it
+			log.Info("Deleting EnvoyFilter as externalAccess label is not present",
+				"namespace", "istio-system",
+				"name", envoyFilterName(instance.Name, instance.Namespace))
+			err = r.Delete(context.TODO(), foundEnvoyFilter)
+			if err != nil {
+				return err
+			}
+		} else if !apierrs.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
+
+	// externalAccess label exists, create/update EnvoyFilter
+	envoyFilter, err := generateEnvoyFilter(instance)
+	if err != nil {
+		log.Info("Unable to generate EnvoyFilter...", err)
+		return err
+	}
+
+	// Note: We don't set controller reference for EnvoyFilter because it's in istio-system namespace
+	// and the notebook is in a different namespace
+
+	// Check if the EnvoyFilter already exists
+	foundEnvoyFilter := &unstructured.Unstructured{}
+	justCreated := false
+	foundEnvoyFilter.SetAPIVersion("networking.istio.io/v1alpha3")
+	foundEnvoyFilter.SetKind("EnvoyFilter")
+	err = r.Get(context.TODO(), types.NamespacedName{
+		Name:      envoyFilterName(instance.Name, instance.Namespace),
+		Namespace: "istio-system",
+	}, foundEnvoyFilter)
+
+	if err != nil && apierrs.IsNotFound(err) {
+		log.Info("Creating EnvoyFilter", "namespace", "istio-system", "name",
+			envoyFilterName(instance.Name, instance.Namespace))
+		err = r.Create(context.TODO(), envoyFilter)
+		justCreated = true
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+
+	if !justCreated && !reflect.DeepEqual(envoyFilter.Object["spec"], foundEnvoyFilter.Object["spec"]) {
+		log.Info("Updating EnvoyFilter", "namespace", "istio-system", "name",
+			envoyFilterName(instance.Name, instance.Namespace))
+		foundEnvoyFilter.Object["spec"] = envoyFilter.Object["spec"]
+		err = r.Update(context.TODO(), foundEnvoyFilter)
 		if err != nil {
 			return err
 		}
@@ -716,12 +984,20 @@ func (r *NotebookReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &corev1.Event{}},
 			handler.EnqueueRequestsFromMapFunc(mapEventToRequest),
 			builder.WithPredicates(predNBEvents(r)))
-	// watch Istio virtual service
+	// watch Istio virtual service and authorization policy
 	if os.Getenv("USE_ISTIO") == "true" {
 		virtualService := &unstructured.Unstructured{}
 		virtualService.SetAPIVersion("networking.istio.io/v1alpha3")
 		virtualService.SetKind("VirtualService")
 		builder.Owns(virtualService)
+
+		authorizationPolicy := &unstructured.Unstructured{}
+		authorizationPolicy.SetAPIVersion("security.istio.io/v1beta1")
+		authorizationPolicy.SetKind("AuthorizationPolicy")
+		builder.Owns(authorizationPolicy)
+
+		// Note: We don't add EnvoyFilter to Owns() because it's created in istio-system namespace
+		// and cross-namespace ownership is not supported by controller-runtime
 	}
 
 	err := builder.Complete(r)
