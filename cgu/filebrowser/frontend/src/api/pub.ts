@@ -5,7 +5,7 @@ export async function fetch(url: string, password: string = "") {
   url = removePrefix(url);
 
   const res = await fetchURL(
-    `/api/public/share${url}`,
+    `/share/share${url}`,
     {
       headers: { "X-SHARE-PASSWORD": encodeURIComponent(password) },
     },
@@ -38,7 +38,7 @@ export function download(
   token: string,
   ...files: string[]
 ) {
-  let url = `${baseURL}/api/public/dl/${hash}`;
+  let url = `${baseURL}/share/api/public/dl/${hash}`;
 
   if (files.length === 1) {
     url += encodeURIComponent(files[0]) + "?";
@@ -71,5 +71,5 @@ export function getDownloadURL(res: Resource, inline = false) {
     ...(res.token && { token: res.token }),
   };
 
-  return createURL("api/public/dl/" + res.hash + res.path, params, false);
+  return createURL("/share/dl/" + res.hash + res.path, params, false);
 }

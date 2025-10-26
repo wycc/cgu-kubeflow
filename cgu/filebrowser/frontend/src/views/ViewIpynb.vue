@@ -1,3 +1,5 @@
+<!--This file is for the ipynb viewer in share mode-->
+
 <template>
   <div>
     <button @click="sendPutRequest">Edit</button>
@@ -40,13 +42,6 @@ const defaultMathJaxTypesetterConfig = { // define a default MathJax typesetter 
   url: 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js',
   config: 'TeX-AMS_HTML-full,Safe',
 };
-// const props = defineProps<{
-//   base: string;
-//   noLink?: boolean;
-//   showEdit?: boolean;
-//   name?: string;
-//   content?: string;
-// }>();
 
 onMounted(async () => {
   if (!notebookName) {
@@ -57,8 +52,8 @@ onMounted(async () => {
   // 取得 token
   const token = route.query.token as string || '';
   try {
-    // 取得 notebook 內容（用 public dl）
-    const res = await fetch(`${window.location.href.split("/").slice(0, -2).join("/")}/api/public/dl/${encodeURIComponent(token)}?inline=true`);
+    // 取得 notebook 內容（用 /share/dl）
+    const res = await fetch(`${window.location.href.split("/").slice(0, -2).join("/")}/share/dl/${encodeURIComponent(token)}?inline=true`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
     notebookContent.value = text;
@@ -80,27 +75,31 @@ onMounted(async () => {
     notebookContainer.value.innerHTML = "";
     notebookContainer.value.appendChild(notebookInstance.notebookHTML);
   } else {
-    console.error('Notebook content not loaded');
+    console.error('Content is not loaded');
   }
 });
 
 
 const fileUrl = computed(() => {
   const parts = window.location.href.split("/");
-  console.log(parts)
-  return parts.slice(0, 6).join("/") + "/api/public/file/";
+  const url = parts.slice(0, 6).join("/") + "/share/file/";
+  console.log(url);
+  return parts.slice(0, 6).join("/") + "/share/file/";
 });
 const jupyterUrl = computed(() => {
   const parts = window.location.href.split("/");
-  console.log(parts)
+  const url = parts.slice(0, 6).join("/") + "/share" + "/api" + "/contents";
+  console.log(url);
   if (parts.length > 0) {
     parts[3] = "notebook";
     parts[5] = "editor";
-    parts[6] = "api";
   }
-  return parts.slice(0, 7).join("/") + "/contents";
+  return parts.slice(0, 6).join("/") + "/share" + "/api" + "/contents";
 });
 const sendPutRequest = async () => {
+  const parts = window.location.href.split("/");
+  const user = await fetch(parts.slice(0, 6).join("/") + "/share" + "/user");
+  console.log(user);
   const response = await fetch(fileUrl.value, {
     method: "PUT",
     headers: {

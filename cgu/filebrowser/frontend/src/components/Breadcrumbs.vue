@@ -113,7 +113,6 @@ const sendPutRequest = async () => {
       type: "file",
       name: props.name,
       path: "/home/jovyan/",
-      // content: btoa(unescape(encodeURIComponent(String(props.content)))),
       content: String(props.content),
     }),
   });
