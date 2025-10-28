@@ -192,10 +192,17 @@ router.beforeResolve(async (to, from, next) => {
 
   // this will only be null on first route
   if (from.name == null) {
-    try {
-      await initAuth();
-    } catch (error) {
-      console.error(error);
+    // If the first route is a public share link, skip initAuth to avoid
+    // triggering `/api/login` on page load. Auth init will not run for
+    // share pages because they are public.
+    if (to.path.startsWith("/share")) {
+      // skip auth init for share pages
+    } else {
+      try {
+        await initAuth();
+      } catch (error) {
+        console.error(error);
+      }
     }
   }
 
