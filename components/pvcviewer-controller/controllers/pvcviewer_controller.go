@@ -507,16 +507,32 @@ func (r *PVCViewerReconciler) reconcilePublicShareResources(
 		return fmt.Errorf("failed to reconcile share VirtualService: %w", err)
 	}
 
+	if err := r.reconcileStaticVirtualService(ctx, log, viewer, commonLabels); err != nil {
+		return fmt.Errorf("failed to reconcile static VirtualService: %w", err)
+	}
+
 	if err := r.reconcileShareEnvoyFilter(ctx, log, viewer); err != nil {
 		return fmt.Errorf("failed to reconcile share EnvoyFilter: %w", err)
+	}
+
+	if err := r.reconcileStaticEnvoyFilter(ctx, log, viewer); err != nil {
+		return fmt.Errorf("failed to reconcile static EnvoyFilter: %w", err)
 	}
 
 	if err := r.reconcileShareAuthPolicyGateway(ctx, log, viewer); err != nil {
 		return fmt.Errorf("failed to reconcile share AuthorizationPolicy (Gateway): %w", err)
 	}
 
+	if err := r.reconcileStaticAuthPolicyGateway(ctx, log, viewer); err != nil {
+		return fmt.Errorf("failed to reconcile static AuthorizationPolicy (Gateway): %w", err)
+	}
+
 	if err := r.reconcileShareAuthPolicyBackend(ctx, log, viewer, commonLabels); err != nil {
 		return fmt.Errorf("failed to reconcile share AuthorizationPolicy (Backend): %w", err)
+	}
+
+	if err := r.reconcileStaticAuthPolicyBackend(ctx, log, viewer, commonLabels); err != nil {
+		return fmt.Errorf("failed to reconcile static AuthorizationPolicy (Backend): %w", err)
 	}
 
 	return nil
@@ -588,6 +604,72 @@ func (r *PVCViewerReconciler) reconcileShareVirtualService(
 	return r.createOrUpdateUnstructured(ctx, log, vs, "Share VirtualService")
 }
 
+// reconcileStaticVirtualService creates or updates the VirtualService for public static access
+func (r *PVCViewerReconciler) reconcileStaticVirtualService(
+	ctx context.Context,
+	log logr.Logger,
+	viewer *kubefloworgv1alpha1.PVCViewer,
+	commonLabels map[string]string,
+) error {
+	vsName := fmt.Sprintf("pvcviewer-static-%s", viewer.Name)
+	routeName := fmt.Sprintf("pvcviewer-%s-%s-static-public", viewer.Namespace, viewer.Name)
+	staticPath := fmt.Sprintf("%s/%s/%s/static/",
+		viewer.Spec.Networking.BasePrefix,
+		viewer.Namespace,
+		viewer.Name)
+
+	// Get the istio gateway from the environment variable or use the default
+	istioGateway := os.Getenv(istioGatewayEnvKey)
+	if istioGateway == "" {
+		istioGateway = defaultIstioGateway
+	}
+
+	vs := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "networking.istio.io/v1beta1",
+			"kind":       "VirtualService",
+			"metadata": map[string]interface{}{
+				"name":      vsName,
+				"namespace": viewer.Namespace,
+				"labels":    commonLabels,
+			},
+			"spec": map[string]interface{}{
+				"hosts":    []string{"*"},
+				"gateways": []string{istioGateway},
+				"http": []interface{}{
+					map[string]interface{}{
+						"name": routeName,
+						"match": []interface{}{
+							map[string]interface{}{
+								"uri": map[string]interface{}{
+									"prefix": staticPath,
+								},
+							},
+						},
+						"route": []interface{}{
+							map[string]interface{}{
+								"destination": map[string]interface{}{
+									"host": fmt.Sprintf("%s%s.%s.svc.cluster.local",
+										resourcePrefix, viewer.Name, viewer.Namespace),
+									"port": map[string]interface{}{
+										"number": int64(servicePort),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(viewer, vs, r.Scheme); err != nil {
+		return err
+	}
+
+	return r.createOrUpdateUnstructured(ctx, log, vs, "Static VirtualService")
+}
+
 // reconcileShareEnvoyFilter creates or updates the EnvoyFilter to bypass authentication
 func (r *PVCViewerReconciler) reconcileShareEnvoyFilter(
 	ctx context.Context,
@@ -629,6 +711,49 @@ func (r *PVCViewerReconciler) reconcileShareEnvoyFilter(
 
 	// Note: EnvoyFilter in istio-system cannot use cross-namespace OwnerReference
 	return r.createOrUpdateUnstructured(ctx, log, ef, "Share EnvoyFilter")
+}
+
+// reconcileStaticEnvoyFilter creates or updates the EnvoyFilter to bypass authentication for static content
+func (r *PVCViewerReconciler) reconcileStaticEnvoyFilter(
+	ctx context.Context,
+	log logr.Logger,
+	viewer *kubefloworgv1alpha1.PVCViewer,
+) error {
+	efName := fmt.Sprintf("bypass-auth-pvcviewer-static-%s-%s",
+		viewer.Namespace, viewer.Name)
+	routeName := fmt.Sprintf("pvcviewer-%s-%s-static-public",
+		viewer.Namespace, viewer.Name)
+
+	ef := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "networking.istio.io/v1alpha3",
+			"kind":       "EnvoyFilter",
+			"metadata": map[string]interface{}{
+				"name":      efName,
+				"namespace": "istio-system",
+				"labels": map[string]string{
+					pvcviewerNameLabelKey:      viewer.Name,
+					pvcviewerNamespaceLabelKey: viewer.Namespace,
+				},
+			},
+			"spec": map[string]interface{}{
+				"workloadSelector": map[string]interface{}{
+					"labels": map[string]interface{}{
+						"istio": "ingressgateway",
+					},
+				},
+				"configPatches": []interface{}{
+					// HTTP port 8080
+					createEnvoyFilterPatch(routeName, "*:8080"),
+					// HTTPS port 443
+					createEnvoyFilterPatch(routeName, "*:443"),
+				},
+			},
+		},
+	}
+
+	// Note: EnvoyFilter in istio-system cannot use cross-namespace OwnerReference
+	return r.createOrUpdateUnstructured(ctx, log, ef, "Static EnvoyFilter")
 }
 
 // createEnvoyFilterPatch creates a config patch for EnvoyFilter
@@ -710,6 +835,56 @@ func (r *PVCViewerReconciler) reconcileShareAuthPolicyGateway(
 	return r.createOrUpdateUnstructured(ctx, log, ap, "Share AuthorizationPolicy (Gateway)")
 }
 
+// reconcileStaticAuthPolicyGateway creates or updates the Gateway AuthorizationPolicy for static content
+func (r *PVCViewerReconciler) reconcileStaticAuthPolicyGateway(
+	ctx context.Context,
+	log logr.Logger,
+	viewer *kubefloworgv1alpha1.PVCViewer,
+) error {
+	apName := fmt.Sprintf("allow-pvcviewer-static-%s-%s-gw",
+		viewer.Namespace, viewer.Name)
+	staticPath := fmt.Sprintf("%s/%s/%s/static/*",
+		viewer.Spec.Networking.BasePrefix,
+		viewer.Namespace,
+		viewer.Name)
+
+	ap := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "security.istio.io/v1",
+			"kind":       "AuthorizationPolicy",
+			"metadata": map[string]interface{}{
+				"name":      apName,
+				"namespace": "istio-system",
+				"labels": map[string]string{
+					pvcviewerNameLabelKey:      viewer.Name,
+					pvcviewerNamespaceLabelKey: viewer.Namespace,
+				},
+			},
+			"spec": map[string]interface{}{
+				"selector": map[string]interface{}{
+					"matchLabels": map[string]interface{}{
+						"istio": "ingressgateway",
+					},
+				},
+				"action": "ALLOW",
+				"rules": []interface{}{
+					map[string]interface{}{
+						"to": []interface{}{
+							map[string]interface{}{
+								"operation": map[string]interface{}{
+									"paths": []string{staticPath},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return r.createOrUpdateUnstructured(ctx, log, ap, "Static AuthorizationPolicy (Gateway)")
+}
+
 // reconcileShareAuthPolicyBackend creates or updates the Backend AuthorizationPolicy
 func (r *PVCViewerReconciler) reconcileShareAuthPolicyBackend(
 	ctx context.Context,
@@ -768,6 +943,64 @@ func (r *PVCViewerReconciler) reconcileShareAuthPolicyBackend(
 	return r.createOrUpdateUnstructured(ctx, log, ap, "Share AuthorizationPolicy (Backend)")
 }
 
+// reconcileStaticAuthPolicyBackend creates or updates the Backend AuthorizationPolicy for static content
+func (r *PVCViewerReconciler) reconcileStaticAuthPolicyBackend(
+	ctx context.Context,
+	log logr.Logger,
+	viewer *kubefloworgv1alpha1.PVCViewer,
+	commonLabels map[string]string,
+) error {
+	apName := fmt.Sprintf("allow-pvcviewer-static-%s-inbound", viewer.Name)
+
+	// Fixed allowed HTTP methods (read-only operations)
+	methods := []string{"GET", "HEAD", "OPTIONS"}
+
+	// Path configuration: need to match both external and internal paths
+	externalPath := fmt.Sprintf("%s/%s/%s/static/*",
+		viewer.Spec.Networking.BasePrefix,
+		viewer.Namespace,
+		viewer.Name)
+	internalPath := "/static/*"
+
+	ap := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "security.istio.io/v1",
+			"kind":       "AuthorizationPolicy",
+			"metadata": map[string]interface{}{
+				"name":      apName,
+				"namespace": viewer.Namespace,
+				"labels":    commonLabels,
+			},
+			"spec": map[string]interface{}{
+				"selector": map[string]interface{}{
+					"matchLabels": map[string]interface{}{
+						instanceLabelKey: resourcePrefix + viewer.Name,
+					},
+				},
+				"action": "ALLOW",
+				"rules": []interface{}{
+					map[string]interface{}{
+						"to": []interface{}{
+							map[string]interface{}{
+								"operation": map[string]interface{}{
+									"methods": methods,
+									"paths":   []string{externalPath, internalPath},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := ctrl.SetControllerReference(viewer, ap, r.Scheme); err != nil {
+		return err
+	}
+
+	return r.createOrUpdateUnstructured(ctx, log, ap, "Static AuthorizationPolicy (Backend)")
+}
+
 // createOrUpdateUnstructured creates or updates an unstructured resource
 func (r *PVCViewerReconciler) createOrUpdateUnstructured(
 	ctx context.Context,
@@ -801,35 +1034,61 @@ func (r *PVCViewerReconciler) createOrUpdateUnstructured(
 	return r.Update(ctx, obj)
 }
 
-// cleanupIstioSystemResources removes public share resources from istio-system namespace
+// cleanupIstioSystemResources removes public share and static resources from istio-system namespace
 func (r *PVCViewerReconciler) cleanupIstioSystemResources(
 	ctx context.Context,
 	log logr.Logger,
 	viewer *kubefloworgv1alpha1.PVCViewer,
 ) error {
-	// Delete EnvoyFilter
-	efName := fmt.Sprintf("bypass-auth-pvcviewer-share-%s-%s",
+	// Delete Share EnvoyFilter
+	shareEfName := fmt.Sprintf("bypass-auth-pvcviewer-share-%s-%s",
 		viewer.Namespace, viewer.Name)
-	ef := &unstructured.Unstructured{}
-	ef.SetAPIVersion("networking.istio.io/v1alpha3")
-	ef.SetKind("EnvoyFilter")
-	ef.SetName(efName)
-	ef.SetNamespace("istio-system")
-	if err := r.Delete(ctx, ef); err != nil && !apierrs.IsNotFound(err) {
-		log.Error(err, "Failed to delete EnvoyFilter", "name", efName)
+	shareEf := &unstructured.Unstructured{}
+	shareEf.SetAPIVersion("networking.istio.io/v1alpha3")
+	shareEf.SetKind("EnvoyFilter")
+	shareEf.SetName(shareEfName)
+	shareEf.SetNamespace("istio-system")
+	if err := r.Delete(ctx, shareEf); err != nil && !apierrs.IsNotFound(err) {
+		log.Error(err, "Failed to delete Share EnvoyFilter", "name", shareEfName)
 		return err
 	}
 
-	// Delete Gateway AuthorizationPolicy
-	apName := fmt.Sprintf("allow-pvcviewer-share-%s-%s-gw",
+	// Delete Static EnvoyFilter
+	staticEfName := fmt.Sprintf("bypass-auth-pvcviewer-static-%s-%s",
 		viewer.Namespace, viewer.Name)
-	ap := &unstructured.Unstructured{}
-	ap.SetAPIVersion("security.istio.io/v1")
-	ap.SetKind("AuthorizationPolicy")
-	ap.SetName(apName)
-	ap.SetNamespace("istio-system")
-	if err := r.Delete(ctx, ap); err != nil && !apierrs.IsNotFound(err) {
-		log.Error(err, "Failed to delete AuthorizationPolicy (Gateway)", "name", apName)
+	staticEf := &unstructured.Unstructured{}
+	staticEf.SetAPIVersion("networking.istio.io/v1alpha3")
+	staticEf.SetKind("EnvoyFilter")
+	staticEf.SetName(staticEfName)
+	staticEf.SetNamespace("istio-system")
+	if err := r.Delete(ctx, staticEf); err != nil && !apierrs.IsNotFound(err) {
+		log.Error(err, "Failed to delete Static EnvoyFilter", "name", staticEfName)
+		return err
+	}
+
+	// Delete Share Gateway AuthorizationPolicy
+	shareApName := fmt.Sprintf("allow-pvcviewer-share-%s-%s-gw",
+		viewer.Namespace, viewer.Name)
+	shareAp := &unstructured.Unstructured{}
+	shareAp.SetAPIVersion("security.istio.io/v1")
+	shareAp.SetKind("AuthorizationPolicy")
+	shareAp.SetName(shareApName)
+	shareAp.SetNamespace("istio-system")
+	if err := r.Delete(ctx, shareAp); err != nil && !apierrs.IsNotFound(err) {
+		log.Error(err, "Failed to delete Share AuthorizationPolicy (Gateway)", "name", shareApName)
+		return err
+	}
+
+	// Delete Static Gateway AuthorizationPolicy
+	staticApName := fmt.Sprintf("allow-pvcviewer-static-%s-%s-gw",
+		viewer.Namespace, viewer.Name)
+	staticAp := &unstructured.Unstructured{}
+	staticAp.SetAPIVersion("security.istio.io/v1")
+	staticAp.SetKind("AuthorizationPolicy")
+	staticAp.SetName(staticApName)
+	staticAp.SetNamespace("istio-system")
+	if err := r.Delete(ctx, staticAp); err != nil && !apierrs.IsNotFound(err) {
+		log.Error(err, "Failed to delete Static AuthorizationPolicy (Gateway)", "name", staticApName)
 		return err
 	}
 
