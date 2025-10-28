@@ -97,7 +97,7 @@ func NewHandler(
 	share.PathPrefix("/file").Handler(monkey(fileHandler, "/share/file/")).Methods("PUT")
 	share.PathPrefix("/dl").Handler(monkey(publicDlHandler, "/share/dl/")).Methods("GET")
 	share.PathPrefix("/share").Handler(monkey(publicShareHandler, "/share/share/")).Methods("GET")
-	share.PathPrefix("/static").Handler(static)
+	// share.PathPrefix("/static").Handler(static)
 	share.HandleFunc("/user", GetUserNamespaceHandler).Methods("GET")
 
 	return stripPrefix(server.BaseURL, r), nil

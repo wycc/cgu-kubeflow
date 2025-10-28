@@ -98,8 +98,6 @@ const jupyterUrl = computed(() => {
 });
 const sendPutRequest = async () => {
   const parts = window.location.href.split("/");
-  const user = await fetch(parts.slice(0, 6).join("/") + "/share" + "/user");
-  console.log(user);
   const response = await fetch(fileUrl.value, {
     method: "PUT",
     headers: {

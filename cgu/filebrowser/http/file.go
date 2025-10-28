@@ -10,7 +10,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -109,7 +114,14 @@ var fileHandler = func(w http.ResponseWriter, r *http.Request, d *data) (int, er
 		http.Error(w, "Bad Request: "+err.Error(), http.StatusBadRequest)
 		return http.StatusBadRequest, err
 	}
-	var namespace = strings.Split(body.Url, "/")[4]
+	// 取得使用者 email（kubeflow 前端通常會在 request header 放 kubeflow-userid）
+	emailAddress := r.Header.Get("kubeflow-userid")
+	if emailAddress == "" {
+		// 如果 header 裡沒有，嘗試從 body 裡找（視情況可改）
+		log.Printf("kubeflow-userid header not found; body URL: %s", body.Url)
+	}
+
+	// namespace (profile) will be determined after k8s clientset is created
 
 	// Build Kubernetes client config (in-cluster or kubeconfig)
 	config, err := rest.InClusterConfig()
@@ -125,6 +137,32 @@ var fileHandler = func(w http.ResponseWriter, r *http.Request, d *data) (int, er
 		http.Error(w, "Failed to create k8s client: "+err.Error(), http.StatusInternalServerError)
 		return http.StatusInternalServerError, err
 	}
+
+	// 使用 dynamic client 列出 Profiles CRD，找出 spec.owner.name == emailAddress 的 profile
+	dyn, err := dynamic.NewForConfig(config)
+	if err != nil {
+		http.Error(w, "Failed to create dynamic client: "+err.Error(), http.StatusInternalServerError)
+		return http.StatusInternalServerError, err
+	}
+	gvr := schema.GroupVersionResource{Group: "kubeflow.org", Version: "v1", Resource: "profiles"}
+	list, err := dyn.Resource(gvr).List(r.Context(), metav1.ListOptions{})
+	if err != nil {
+		http.Error(w, "Failed to list profiles: "+err.Error(), http.StatusBadGateway)
+		return http.StatusBadGateway, err
+	}
+	namespace := ""
+	for _, item := range list.Items {
+		ownerName, found, _ := unstructured.NestedString(item.Object, "spec", "owner", "name")
+		if found && ownerName == emailAddress {
+			namespace = item.GetName()
+			break
+		}
+	}
+	if namespace == "" {
+		http.Error(w, "No profile or namespace found for user: "+emailAddress, http.StatusNotFound)
+		return http.StatusNotFound, nil
+	}
+	log.Printf("%s", namespace)
 
 	// Write content to temporary local file
 	if err := ioutil.WriteFile("/tmp/"+body.Name, []byte(body.Content), 0644); err != nil {
