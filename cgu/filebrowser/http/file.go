@@ -3,6 +3,7 @@ package http
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -11,19 +12,26 @@ import (
 	"os"
 	"path/filepath"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// PVCViewerReconciler reconciles a PVCViewer object
+type PVCViewerReconciler struct {
+	client.Client
+	Scheme *runtime.Scheme
+}
 
 type RequestBody struct {
 	Url     string `json:"url"`
@@ -101,6 +109,17 @@ func CopyFileToPod(config *rest.Config, clientset *kubernetes.Clientset,
 	})
 }
 
+func (r *PVCViewerReconciler) getEditor(ctx context.Context, namespace string) error {
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "editor",
+			Namespace: namespace,
+		},
+	}
+	err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, deployment)
+	return err
+}
+
 var fileHandler = func(w http.ResponseWriter, r *http.Request, d *data) (int, error) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -117,20 +136,17 @@ var fileHandler = func(w http.ResponseWriter, r *http.Request, d *data) (int, er
 	// 取得使用者 email（kubeflow 前端通常會在 request header 放 kubeflow-userid）
 	emailAddress := r.Header.Get("kubeflow-userid")
 	if emailAddress == "" {
-		// 如果 header 裡沒有，嘗試從 body 裡找（視情況可改）
-		log.Printf("kubeflow-userid header not found; body URL: %s", body.Url)
+		// 如果 header 裡沒有，提供一個預設值或回傳錯誤
+		log.Printf("kubeflow-userid header not found")
+		http.Error(w, "kubeflow-userid header is required", http.StatusBadRequest)
+		return http.StatusBadRequest, nil
 	}
 
-	// namespace (profile) will be determined after k8s clientset is created
-
-	// Build Kubernetes client config (in-cluster or kubeconfig)
+	// Build Kubernetes client config (in-cluster)
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		config, err = clientcmd.BuildConfigFromFlags("", "/path/to/kubeconfig")
-		if err != nil {
-			http.Error(w, "Failed to load kubeconfig: "+err.Error(), http.StatusInternalServerError)
-			return http.StatusInternalServerError, err
-		}
+		http.Error(w, "Failed to create in-cluster k8s config: "+err.Error(), http.StatusInternalServerError)
+		return http.StatusInternalServerError, err
 	}
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -162,7 +178,7 @@ var fileHandler = func(w http.ResponseWriter, r *http.Request, d *data) (int, er
 		http.Error(w, "No profile or namespace found for user: "+emailAddress, http.StatusNotFound)
 		return http.StatusNotFound, nil
 	}
-	log.Printf("%s", namespace)
+	log.Printf("Found namespace '%s' for user '%s'", namespace, emailAddress)
 
 	// Write content to temporary local file
 	if err := ioutil.WriteFile("/tmp/"+body.Name, []byte(body.Content), 0644); err != nil {
@@ -171,51 +187,48 @@ var fileHandler = func(w http.ResponseWriter, r *http.Request, d *data) (int, er
 	}
 
 	// Copy file into target Pod
-	// 嘗試 patch Kubeflow Notebook CRD 來啟動 notebook
-	// 取得 Notebook CRD 物件
-	notebookRes := clientset.RESTClient().
-		Get().
-		AbsPath("/apis/kubeflow.org/v1/namespaces/" + namespace + "/notebooks/editor")
-	notebookRaw, err := notebookRes.Do(r.Context()).Raw()
+	// 透過檢查 deployment 的 replicas 來確認 notebook 是否正在運行
+	deployment, err := clientset.AppsV1().Deployments(namespace).Get(r.Context(), "editor", metav1.GetOptions{})
 	if err != nil {
-		http.Error(w, "Failed to get notebook CRD: "+err.Error(), http.StatusBadGateway)
+		http.Error(w, "Failed to get editor deployment: "+err.Error(), http.StatusBadGateway)
 		return http.StatusBadGateway, err
 	}
-	var notebookObj map[string]interface{}
-	if err := json.Unmarshal(notebookRaw, &notebookObj); err != nil {
-		http.Error(w, "Failed to parse notebook CRD: "+err.Error(), http.StatusBadGateway)
+
+	// 如果 replicas 為 0，代表 notebook 已停止
+	if deployment.Spec.Replicas != nil && *deployment.Spec.Replicas == 0 {
+		log.Printf("Notebook deployment is scaled to 0 replicas. It's likely stopped.")
+		// 這裡您可以選擇直接回傳錯誤，或嘗試去啟動它。
+		// 若要啟動，仍需透過 patch Notebook CRD，無法單純修改 deployment。
+		http.Error(w, "Notebook is not running. Please start it from the Kubeflow UI and retry.", http.StatusAccepted)
+		return http.StatusAccepted, nil
+	}
+
+	// 檢查 Pod 狀態，確保有正在運行的 Pod
+	pods, err := clientset.CoreV1().Pods(namespace).List(r.Context(), metav1.ListOptions{
+		LabelSelector: "app=editor", // 假設 deployment 使用此標籤
+	})
+	if err != nil {
+		http.Error(w, "Failed to list editor pods: "+err.Error(), http.StatusBadGateway)
 		return http.StatusBadGateway, err
 	}
-	annotations := notebookObj["metadata"].(map[string]interface{})["annotations"].(map[string]interface{})
-	if val, ok := annotations["kubeflow-resource-stopped"]; ok && val != nil {
-		// Notebook is stopped, patch to remove annotation to start it
-		log.Printf("Notebook is stopped, patching to start it: %s", body.Name)
-		nbRest := clientset.RESTClient()
-		patchMap := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"annotations": map[string]interface{}{
-					"kubeflow-resource-stopped": nil,
-				},
-			},
+
+	podName := ""
+	for _, pod := range pods.Items {
+		if pod.Status.Phase == corev1.PodRunning {
+			podName = pod.Name
+			break
 		}
-		patchBody, _ := json.Marshal(patchMap)
-		res := nbRest.Patch("merge").
-			AbsPath("/apis/kubeflow.org/v1/namespaces/"+namespace+"/notebooks/editor").
-			SetHeader("Content-Type", "application/merge-patch+json").
-			Body(patchBody).
-			Do(r.Context())
-		if res.Error() != nil {
-			http.Error(w, "Failed to patch notebook: "+res.Error().Error(), http.StatusBadGateway)
-			return http.StatusBadGateway, res.Error()
-		}
-		http.Error(w, "Notebook is not running. Starting it, please retry later.", http.StatusAccepted)
+	}
+
+	if podName == "" {
+		http.Error(w, "No running editor pod found. Please wait for the pod to start and retry.", http.StatusAccepted)
 		return http.StatusAccepted, nil
 	}
 
 	err = CopyFileToPod(config, clientset,
-		namespace,  // namespace
-		"editor-0", // pod name
-		"editor",   // container name
+		namespace, // namespace
+		podName,   // pod name
+		"editor",  // container name
 		"/tmp/"+body.Name,
 		filepath.Dir(body.Path),
 	)
