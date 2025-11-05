@@ -33,7 +33,9 @@ const token = (route.query.token as string) || '';
 
 const notebookContainer = ref<HTMLElement | null>(null);
 const notebookContent = ref<any>(null);
-let targetNamespace = "";
+let targetNamespace = ref<string | null>(null);
+// 在載入時先準備好 XSRF token（非 reactive，供後續多個 API 使用）
+let preloadedXsrf: string | null = null;
 const defaultMarkdownParser = markdown({ // define a default markdown parser
   html: true,
   xhtmlOut: true,
@@ -53,6 +55,22 @@ onMounted(async () => {
 
   // 取得 token
   const token = route.query.token as string || '';
+  // 預先初始化 XSRF token（非阻塞，強制透過 iframe 取得）
+  (async () => {
+    try {
+      preloadedXsrf = await getXsrfViaIframe();
+    } catch (e) {
+      console.warn('Preload XSRF failed:', e);
+    }
+  })();
+  // 預先取得namespace
+  (async () => {
+    try {
+      targetNamespace.value = await getNamespace();
+    } catch (e) {
+      console.warn('Preload namespace failed:', e);
+    }
+  })();
   try {
     // 取得 notebook 內容（用 /share/dl）
     const res = await fetch(`${window.location.href.split("/").slice(0, -2).join("/")}/share/dl/${encodeURIComponent(token)}?inline=true`);
@@ -84,7 +102,6 @@ onMounted(async () => {
     method: "GET",
     credentials: "include"
   });
-  targetNamespace = "pattentest"; // 先hardcode，之後要改成動態取得
 });
 
 
@@ -97,7 +114,7 @@ const jupyterUrl = computed(() => {
   const parts = window.location.href.split("/");
   // protocol + host
   const base = parts.slice(0, 3).join("/");
-  const url = `${base}/notebook/${targetNamespace}/editor/api/contents`;
+  const url = `${base}/notebook/${targetNamespace.value}/editor/api/contents`;
   return url;
 });
 // 嘗試取得對應的 JupyterLab base URL（用於預先種下 xsrf cookie）
@@ -130,17 +147,6 @@ function getAnyXsrfCookie(): string | null {
     if (/xsrf/i.test(k)) return decodeURIComponent(v || '');
   }
   return null;
-}
-// 若沒有 xsrf cookie，先打一次 lab base 讓伺服器種 cookie
-async function ensureXsrfCookie(): Promise<void> {
-  const before = document.cookie;
-  const had = /xsrf/i.test(before);
-  if (had) return;
-  try {
-    await fetch(labBaseUrl.value, { method: 'GET', credentials: 'include' });
-  } catch (e) {
-    console.warn('Preflight lab GET failed (still continuing):', e);
-  }
 }
 
 // 建立一個隱藏 iframe 指向 labBaseUrl，讀取該路徑可見的 cookie（純前端做法）
@@ -183,38 +189,59 @@ async function getXsrfViaIframe(): Promise<string | null> {
     return null;
   }
 }
-const sendPutRequest = async () => {
-  const parts = window.location.href.split("/");
-  // 先嘗試確保 xsrf cookie 存在（同網域下 server 會種 cookie）
-  await ensureXsrfCookie();
-  // 嘗試讀取多種可能的 xsrf cookie 名稱
-  const xsrfToken = getCookie("_xsrf") || getCookie("XSRF-TOKEN") || getAnyXsrfCookie();
-  let finalXsrf = xsrfToken;
-  if (!finalXsrf) {
-    // 若目前頁面路徑看不到 cookie，改用 iframe 在 lab 路徑下讀
-    finalXsrf = await getXsrfViaIframe();
-  }
-  // 構建必要的 headers，包含 XSRF 與（若存在）分享 token 的授權
+async function getNamespace(){
+  let finalXsrf = preloadedXsrf || await getXsrfViaIframe();
+  if (!finalXsrf) finalXsrf = await getXsrfViaIframe();
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "X-Requested-With": "XMLHttpRequest",
+    'Content-Type': 'application/json',
+    // 'X-Requested-With': 'XMLHttpRequest',
   };
   if (finalXsrf) {
-    headers["X-XSRFToken"] = finalXsrf;
+    headers['X-XSRFToken'] = finalXsrf;
   }
   if (token) {
-    headers["Authorization"] = `token ${token}`;
+    headers['Authorization'] = `token ${token}`;
+  }
+  const response = await fetch(
+    window.location.href.split("/").slice(0, 3).join("/") + "/api/workgroup/env-info", {
+      method: "GET",
+      headers,
+      credentials: "include"
+  });
+  let responseJson = await JSON.parse(await response.text())
+  for (var i=0; i < responseJson.namespaces.length; i++){
+    if (responseJson.namespaces[i].role === "owner"){
+      return responseJson.namespaces[i].namespace;
+    }
+  }
+}
+const sendPutRequest = async () => {
+  if (!targetNamespace.value) targetNamespace.value = await getNamespace();
+  const parts = window.location.href.split("/");
+  // 一律透過 iframe 取得/刷新 xsrf（避免不同路徑導致 cookie 不可見）
+  let finalXsrf = preloadedXsrf;
+  if (!finalXsrf) finalXsrf = await getXsrfViaIframe();
+  // 構建必要的 headers，包含 XSRF 與（若存在）分享 token 的授權
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
+  };
+  if (finalXsrf) {
+    headers['X-XSRFToken'] = finalXsrf;
+  }
+  if (token) {
+    headers['Authorization'] = `token ${token}`;
   }
   // 如伺服器要求以 query 帶 token，可作為後備（保留原行為，僅在 xsrf 缺失且有 token 時嘗試）
   const targetUrl = token
     ? (jupyterUrl.value + "/" + notebookName + `?token=${encodeURIComponent(token)}`)
     : (jupyterUrl.value + "/" + notebookName);
   // 一律帶上 cookie，並同時送出 XSRF header（以及可能的 token）
-  const credentialsMode: RequestCredentials = 'include';
+  // const credentialsMode: RequestCredentials = 'include';
   const response = await fetch(targetUrl, {
     method: "PUT",
     headers,
-    credentials: credentialsMode,
+    credentials: "include",
     body: JSON.stringify({
       content: Base64.encode(notebookContent.value),
       format: "base64",
