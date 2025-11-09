@@ -58,7 +58,7 @@ onMounted(async () => {
   // 預先初始化 XSRF token（非阻塞，強制透過 iframe 取得）
   (async () => {
     try {
-      preloadedXsrf = await getXsrfViaIframe();
+      preloadedXsrf = await getXsrfViaIframe(labBaseUrl.value);
     } catch (e) {
       console.warn('Preload XSRF failed:', e);
     }
@@ -174,9 +174,9 @@ function parseXsrfFromCookieStr(cookieStr: string): string | null {
   return null;
 }
 
-async function getXsrfViaIframe(): Promise<string | null> {
+async function getXsrfViaIframe(url: string): Promise<string | null> {
   try {
-    const iframe = await createHiddenIframe(labBaseUrl.value);
+    const iframe = await createHiddenIframe(url);
     // 等待一小段時間，確保 cookie 已被寫入
     await new Promise((r) => setTimeout(r, 100));
     const iframeDoc = iframe.contentDocument || iframe.ownerDocument;
@@ -190,11 +190,11 @@ async function getXsrfViaIframe(): Promise<string | null> {
   }
 }
 async function getNamespace(){
-  let finalXsrf = preloadedXsrf || await getXsrfViaIframe();
-  if (!finalXsrf) finalXsrf = await getXsrfViaIframe();
+  let finalXsrf = preloadedXsrf || await getXsrfViaIframe(labBaseUrl.value);
+  if (!finalXsrf) finalXsrf = await getXsrfViaIframe(labBaseUrl.value);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    // 'X-Requested-With': 'XMLHttpRequest',
+    'X-Requested-With': 'XMLHttpRequest',
   };
   if (finalXsrf) {
     headers['X-XSRFToken'] = finalXsrf;
@@ -215,12 +215,39 @@ async function getNamespace(){
     }
   }
 }
+
+async function startEditor(namespace: string | null){
+  let finalXsrf = preloadedXsrf || await getXsrfViaIframe(window.location.href.split("/").slice(0, 3).join("/") + "/jupyter/api/");
+  if (!finalXsrf) finalXsrf = await getXsrfViaIframe(window.location.href.split("/").slice(0, 3).join("/") + "/jupyter/api/");
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
+  };
+  if (finalXsrf) {
+    headers['X-XSRF-TOKEN'] = finalXsrf;
+  }
+  if (token) {
+    headers['Authorization'] = `token ${token}`;
+  }
+  const patchBody = {
+    "stopped":false
+  }
+  const response = await fetch(
+    window.location.href.split("/").slice(0, 3).join("/") + `/jupyter/api/namespaces/${namespace}/notebooks/editor`, {
+      method: "PATCH",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(patchBody)
+  });
+  let responseJson = await JSON.parse(await response.text())
+  console.log(response.text())
+}
 const sendPutRequest = async () => {
   if (!targetNamespace.value) targetNamespace.value = await getNamespace();
   const parts = window.location.href.split("/");
   // 一律透過 iframe 取得/刷新 xsrf（避免不同路徑導致 cookie 不可見）
   let finalXsrf = preloadedXsrf;
-  if (!finalXsrf) finalXsrf = await getXsrfViaIframe();
+  if (!finalXsrf) finalXsrf = await getXsrfViaIframe(labBaseUrl.value);
   // 構建必要的 headers，包含 XSRF 與（若存在）分享 token 的授權
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -254,7 +281,8 @@ const sendPutRequest = async () => {
     window.location.href = labBaseUrl.value + "/tree/" + notebookName;
   }
   else if (response.status === 503) {
-    alert("Notebook is not running. Please start it first.");
+    alert("Notebook is not running. Starting it.");
+    startEditor(targetNamespace.value);
   }
   else{
     alert("Unkown Error!!!")
