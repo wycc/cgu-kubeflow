@@ -482,7 +482,7 @@ func generateService(instance *v1beta1.Notebook) *corev1.Service {
 			Namespace: instance.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     "ClusterIP",
+			Type:     "NodePort",
 			Selector: map[string]string{"statefulset": instance.Name},
 			Ports: []corev1.ServicePort{
 				{
