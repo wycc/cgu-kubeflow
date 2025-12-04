@@ -13,6 +13,7 @@ metadata:
 spec:
   template:
     spec:
+      hostIPC: true
       serviceAccountName: {serviceAccount}
       containers:
         - name: {name}
@@ -26,7 +27,7 @@ spec:
             capabilities:
               add:
               - IPC_LOCK              
-        - image: cguaicadmin/qnapcopy:v0.1.8
+        - image: cguaicadmin/qnapcopy:v0.1.15
           name: clone
           env:
             - name: IP

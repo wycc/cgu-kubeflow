@@ -2,6 +2,8 @@ from kubernetes import client, config
 import yaml
 import time,os
 import traceback
+import utils
+
 from kubernetes.config.config_exception import ConfigException
 # Load the Kubernetes configuration
 # Create API endpoints for the core API and custom object API
@@ -29,19 +31,31 @@ the user can customize the behaviour of the clone container.
 """
 FILE_ABS_PATH = os.path.abspath(os.path.dirname(__file__))
 
-NOTEBOOK_TEMPLATE_YAML = os.path.join(
-    FILE_ABS_PATH, "yaml/notebook_template.yaml"
-)
+# NOTEBOOK_TEMPLATE_YAML = os.path.join(
+#     FILE_ABS_PATH, "yaml/notebook_template.yaml"
+# )
 
 SAMPLE_NOTEBOOK = os.path.join(
     FILE_ABS_PATH, "yaml/sample_notebook.yaml"
 )
+
 SAMPLE_PVC = os.path.join(
     FILE_ABS_PATH, "yaml/sample_pvc.yaml"
 )
+
+SAMPLEPVC = [
+    "/etc/config/sample_pvc.yaml",
+    SAMPLE_PVC,
+]
+
 SAMPLE_PV = os.path.join(
     FILE_ABS_PATH, "yaml/sample_pv.yaml"
 )
+
+SAMPLEPV = [
+    "/etc/config/sample_pv.yaml",
+    SAMPLE_PV,
+]
 
 class CloneNotebook:
   def __init__(self):
@@ -151,7 +165,8 @@ class CloneNotebook:
     pv = self.fetch_pv(oldpvname)
 
     # Load the template
-    template = self.load_template(SAMPLE_PV)
+    samplepv_yaml = utils.get_first_existing_file(SAMPLE_PV)
+    template = self.load_template(samplepv_yaml)
 
     # Replace fields in the template with values from the PV
     updated_template = self.replace_fields(template, pv,pv.attribute_map)
@@ -213,7 +228,8 @@ class CloneNotebook:
     
 
     # Load the template
-    template = self.load_template(SAMPLE_PVC)
+    samplepvc_yaml = utils.get_first_existing_file(SAMPLE_PVC)
+    template = self.load_template(samplepvc_yaml)
 
     # Replace fields in the template with values from the PV
     updated_template = self.replace_fields(template, pvc,pvc.attribute_map)

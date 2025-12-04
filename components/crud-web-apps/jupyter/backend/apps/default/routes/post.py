@@ -30,9 +30,10 @@ def post_pvc(namespace):
     except:
         template = None
     newpvcname=None
+    notebookyaml = utils.get_first_existing_file(utils.NOTEBOOK_TEMPLATE)
     if template == None:
       notebook = helpers.load_param_yaml(
-          utils.NOTEBOOK_TEMPLATE_YAML,
+          notebookyaml,
           name=body["name"],
           namespace=namespace,
           isTemplate='\"no\"',
@@ -45,7 +46,7 @@ def post_pvc(namespace):
       oldpvcname = template
       newpvcname = body["name"]+'-source-volume'
       clone_notebook.CloneNotebook().clone_pvc(origin_namespace, oldpvcname, namespace, newpvcname,clone=True)
-      cloneyaml = utils.get_first_existing_file(utils.CLONES)
+      cloneyaml = utils.get_first_existing_file(utils.NOTEBOOK_TEMPLATE_CLONES)
       notebook = helpers.load_param_yaml(
           cloneyaml,
           name=body["name"],
