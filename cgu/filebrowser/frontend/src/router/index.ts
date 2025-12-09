@@ -17,6 +17,7 @@ import { baseURL, name } from "@/utils/constants";
 import i18n from "@/i18n";
 import { recaptcha, loginPage } from "@/utils/constants";
 import { login, validateLogin } from "@/utils/auth";
+import Wait from "@/views/Wait.vue";
 
 const titles = {
   Login: "sidebar.login",
@@ -32,6 +33,7 @@ const titles = {
   NotFound: "errors.notFound",
   InternalServerError: "errors.internal",
   ViewIpynb: "viewIpynb.title",
+  Wait: "Wait.title",
 };
 
 const routes = [
@@ -44,6 +46,11 @@ const routes = [
     path: "/share/viewipynb",
     name: "ViewIpynb",
     component: ViewIpynb,
+  },
+  {
+    path: "/share/waitNotebook",
+    name: "Wait",
+    component: Wait,
   },
   {
     path: "/share",

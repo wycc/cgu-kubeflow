@@ -365,6 +365,8 @@ const raw = computed(() => {
 const inlineLink = computed(() =>
   req.value ? api.getDownloadURL(req.value, true) : ""
 );
+// Dex login URL (adjust if your deployment uses a different path)
+const dexLoginPath = `${window.location.origin}`;
 const viewIpynbLink = computed(() =>
   req.value
     ? { name: 'ViewIpynb', query: { file: req.value.name, token: req.value.hash } }
