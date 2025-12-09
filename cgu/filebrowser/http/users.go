@@ -206,3 +206,25 @@ var userPutHandler = withSelfOrAdmin(func(w http.ResponseWriter, r *http.Request
 
 	return http.StatusOK, nil
 })
+
+func GetUserNamespaceHandler(w http.ResponseWriter, r *http.Request) { // Patten 2025_10_22
+	// 1. 從請求標頭中讀取 Istio 注入的使用者 ID
+	// 這通常就是 Kubeflow 中的 namespace (Profile)
+	// [!! 關鍵 !!]
+	namespace := r.Header.Get("kubeflow-userid")
+
+	if namespace == "" {
+		// 如果標頭是空的，代表請求沒有經過 Istio 驗證
+		http.Error(w, "User not authenticated or header not found", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. 準備 JSON 回應
+	response := map[string]string{
+		"namespace": namespace,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}

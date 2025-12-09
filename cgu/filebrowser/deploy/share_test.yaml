@@ -1,0 +1,142 @@
+# 1) VirtualService（同上）
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: pvcviewer-patten-source
+  namespace: patten
+spec:
+  gateways:
+  - kubeflow/kubeflow-gateway
+  hosts:
+  - "*"
+  http:
+  - name: pvcviewer-patten-source-static-public # 新的、唯一的路由名稱
+    match:
+    - uri:
+        prefix: /share/static/ # 匹配公開的 /share/static/
+    rewrite:
+      uri: /static/ # 重寫為後端 Go 程式認識的 /static/
+    route:
+    - destination:
+        host: pvcviewer-source.patten.svc.cluster.local # 指向同一個後端
+        port:
+          number: 80
+  - name: pvcviewer-patten-source-share-public
+    match:
+    - uri:
+        prefix: /pvcviewers/patten/source/share/
+    route:
+    - destination:
+        host: pvcviewer-source.patten.svc.cluster.local
+        port:
+          number: 80
+---
+# 2) EnvoyFilter（同上）
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: bypass-auth-pvcviewer-patten-source-share
+  namespace: istio-system
+spec:
+  workloadSelector:
+    labels:
+      istio: ingressgateway
+  configPatches:
+  - applyTo: HTTP_ROUTE
+    match:
+      context: GATEWAY
+      routeConfiguration:
+        vhost:
+          name: '*:8080'
+          route:
+            name: pvcviewer-patten-source-static-public # 匹配 VS 的新 name
+    patch:
+      operation: MERGE
+      value:
+        typed_per_filter_config:
+          envoy.filters.http.ext_authz:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
+            disabled: true
+  - applyTo: HTTP_ROUTE
+    match:
+      context: GATEWAY
+      routeConfiguration:
+        vhost:
+          name: '*:443'
+          route:
+            name: pvcviewer-patten-source-static-public # 匹配 VS 的新 name
+    patch:
+      operation: MERGE
+      value:
+        typed_per_filter_config:
+          envoy.filters.http.ext_authz:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
+            disabled: true
+  - applyTo: HTTP_ROUTE
+    match:
+      context: GATEWAY
+      routeConfiguration:
+        vhost:
+          name: '*:8080'
+          route:
+            name: pvcviewer-patten-source-share-public
+    patch:
+      operation: MERGE
+      value:
+        typed_per_filter_config:
+          envoy.filters.http.ext_authz:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
+            disabled: true
+  - applyTo: HTTP_ROUTE
+    match:
+      context: GATEWAY
+      routeConfiguration:
+        vhost:
+          name: '*:443'
+          route:
+            name: pvcviewer-patten-source-share-public
+    patch:
+      operation: MERGE
+      value:
+        typed_per_filter_config:
+          envoy.filters.http.ext_authz:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
+            disabled: true
+---
+# 3) Gateway 層 ALLOW（修正 path）
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-public-pvcviewer-share-gw-patten
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      istio: ingressgateway
+  action: ALLOW
+  rules:
+  - to:
+    - operation:
+        paths:
+        - /pvcviewers/patten/source/share/*
+        - /share/static/*
+---
+# 4) 後端 inbound ALLOW（selector 指 label）
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-public-pvcviewer-share-inbound
+  namespace: patten
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: pvcviewer-source
+  action: ALLOW
+  rules:
+  - to:
+    - operation:
+        methods: ["GET", "HEAD", "PUT", "OPTIONS"]
+        paths:
+        - /pvcviewers/patten/source/share/*
+        - /share/*
+        - /static/*
