@@ -278,42 +278,42 @@ const sendPutRequest = async () => {
       type: "file",
     }),
   });
-  if (response.ok){
-    window.location.href = labBaseUrl.value + "/tree/" + notebookName;
-  }
-  else if (response.status === 503) {
+  // if (response.ok){
+  //   window.location.href = labBaseUrl.value + "/tree/" + notebookName;
+  // }
+  // else if (response.status === 503) {
     // Notebook not running: open the app's wait/editor page so user can start/edit it.
-    console.log('PUT returned 503 — attempting to navigate to /share/waitNotebook', { notebookName, token, namespace: targetNamespace.value });
+  console.log('PUT returned 503 — attempting to navigate to /share/waitNotebook', { notebookName, token, namespace: targetNamespace.value });
 
-    const routeLocation = {
-      path: '/share/waitNotebook',
-      query: {
-        file: notebookName,
-        token: token,
-        namespace: targetNamespace.value || undefined,
-      },
-    };
+  const routeLocation = {
+    path: '/share/waitNotebook',
+    query: {
+      file: notebookName,
+      token: token,
+      namespace: targetNamespace.value || undefined,
+    },
+  };
 
-    try {
-      // Directly set window.location.href to avoid router permission issues
-      const resolved = router.resolve({ path: '/share/waitNotebook', query: { file: notebookName, token, namespace: targetNamespace.value || undefined } });
-      console.log('Navigating to /share/waitNotebook via window.location.href', resolved.href);
-      window.location.href = resolved.href;
-    } catch (e) {
-      console.error('Failed to build wait URL, falling back to location-based path:', e);
-      // best-effort fallback using origin
-      const origin = window.location.origin || window.location.href.split('/').slice(0,3).join('/');
-      const qs = new URLSearchParams({ file: notebookName, token: token });
-      if (targetNamespace.value) qs.set('namespace', targetNamespace.value);
-      window.location.href = `${origin}/share/wait?${qs.toString()}`;
-    }
-
-    // Also attempt to start the editor runtime on the backend
-    startEditor(targetNamespace.value);
+  try {
+    // Directly set window.location.href to avoid router permission issues
+    const resolved = router.resolve({ path: '/share/waitNotebook', query: { file: notebookName, token, namespace: targetNamespace.value || undefined } });
+    console.log('Navigating to /share/waitNotebook via window.location.href', resolved.href);
+    window.location.href = resolved.href;
+  } catch (e) {
+    console.error('Failed to build wait URL, falling back to location-based path:', e);
+    // best-effort fallback using origin
+    const origin = window.location.origin || window.location.href.split('/').slice(0,3).join('/');
+    const qs = new URLSearchParams({ file: notebookName, token: token });
+    if (targetNamespace.value) qs.set('namespace', targetNamespace.value);
+    window.location.href = `${origin}/share/wait?${qs.toString()}`;
   }
-  else{
-    alert("Unkown Error!!!")
-  }
+
+  // Also attempt to start the editor runtime on the backend
+  startEditor(targetNamespace.value);
+  // }
+  // else{
+  //   alert("Unkown Error!!!")
+  // }
   
 };
 </script>
