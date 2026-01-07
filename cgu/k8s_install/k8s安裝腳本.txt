@@ -1,0 +1,144 @@
+apt update
+apt dist-upgrade -y
+apt install net-tools curl git -y
+
+timedatectl set-timezone Asia/Taipei
+timedatectl set-ntp true
+
+#disable ipv6
+echo 'GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} ipv6.disable=1"' \
+  | sudo tee /etc/default/grub.d/90-disable-ipv6.cfg
+update-grub
+
+CONF="/etc/sysctl.d/99-disable-ipv6.conf"
+echo 'net.ipv6.conf.all.disable_ipv6=1' | sudo tee $CONF
+echo 'net.ipv6.conf.default.disable_ipv6=1' | sudo tee -a $CONF
+echo 'net.ipv6.conf.bond0.disable_ipv6=1' | sudo tee -a $CONF
+echo 'net.ipv6.conf.eno1.disable_ipv6=1' | sudo tee -a $CONF
+sysctl -p $CONF
+
+#use cgroup v2
+echo 'GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT} systemd.unified_cgroup_hierarchy=1"' \
+  | sudo tee /etc/default/grub.d/90-use-cgroupv2.cfg
+update-grub
+test -f /sys/fs/cgroup/cgroup.controllers && echo OK
+
+#install cuda + gpu driver
+OS_VER=$(source /etc/os-release; echo $VERSION_ID | tr -d '.')
+curl -OL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu$OS_VER/x86_64/cuda-keyring_1.1-1_all.deb
+dpkg -i cuda-keyring*.deb
+
+apt install linux-headers-$(uname -r)
+apt install --no-install-recommends nvidia-headless-$VER-server nvidia-utils-$VER-server
+apt list --installed 2>/dev/null | grep nvidia-utils | awk -F'/' '{print $1}' | xargs sudo apt-mark hold
+apt list --installed 2>/dev/null | grep nvidia-headless | awk -F'/' '{print $1}' | xargs sudo apt-mark hold
+
+#install docker + ctk
+REPO_KEY="/usr/share/keyrings/docker.gpg"
+REPO_CONF="deb [arch=$(dpkg --print-architecture) signed-by=$REPO_KEY] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o $REPO_KEY
+echo "$REPO_CONF" | sudo tee /etc/apt/sources.list.d/docker.list
+apt update
+VER="26"
+VER="$(apt-cache policy docker-ce | grep $VER | grep -v 'Candidate' | awk '{print $1}' | head -n1)"
+apt install --no-install-recommends -y docker-ce=$VER docker-ce-cli=$VER containerd.io
+apt-mark hold docker-ce docker-ce-cli
+
+VER="1.15"
+VER="$(apt-cache policy nvidia-container-toolkit | grep $VER | grep -v 'Candidate' | awk '{print $1}' | head -n1)"
+apt install --no-install-recommends -y nvidia-container-toolkit-base=$VER
+apt install --no-install-recommends -y nvidia-container-toolkit=$VER
+apt-mark hold nvidia-container-toolkit
+wget https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.15/cri-dockerd_0.3.15.3-0.ubuntu-jammy_amd64.deb
+dpkg -i cri-dockerd_0.3.15.3-0.ubuntu-jammy_amd64.deb
+nvidia-ctk runtime configure --runtime=docker --set-as-default
+systemctl restart docker
+
+#install k8s
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.26/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.26/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+apt update
+VER="1.26"
+VER=$(sudo apt-cache policy  kubelet | grep $VER | awk '{print $2}' | head -n1)
+apt install -y kubelet=$VER kubeadm=$VER kubectl=$VER
+apt-mark hold kubelet kubeadm kubectl
+systemctl restart docker
+swapoff -a
+sed -i '/ swap / s/^/#/' /etc/fstab
+sed -i '/swap.img/ s/^/#/' /etc/fstab
+K8S_API_IP=x.x.x.x
+K8S_POD_CIDR="192.168.0.0/16"
+K8S_VER="$(kubeadm version -o yaml | grep gitVersion | awk '{printf $2}')"
+kubeadm init --v=2  \
+  --apiserver-advertise-address "$K8S_API_IP" \
+  --pod-network-cidr="$K8S_POD_CIDR" \
+  --kubernetes-version "$K8S_VER" \
+  --cri-socket unix:///var/run/cri-dockerd.sock
+mkdir -p $HOME/.kube
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+chown $(id -u):$(id -g) $HOME/.kube/config
+
+#modify file handler
+sed -i -e $'$a\\\nnfs.inotify.max_user_watches = 524288\\nfs.inotify.max_user_instances = 512' /etc/sysctl.conf
+sysctl --system
+
+#modify max pod
+MAX_PODS=254
+if grep -q "maxPods:" config.yaml; then
+  sed -i "s/maxPods: [0-9]*/maxPods: $MAX_PODS/" /var/lib/kubelet/config.yaml
+else
+  echo "maxPods: $MAX_PODS" >> /var/lib/kubelet/config.yaml
+fi
+systemctl restart kubelet
+
+#deploy calico
+VER=3.27.3
+curl -OL https://raw.githubusercontent.com/projectcalico/calico/v$VER/manifests/calico.yaml
+kubectl apply -f calico.yaml
+
+#deploy helm and nvidia device plugin
+REPO_KEY="/usr/share/keyrings/helm.gpg"
+REPO_CONF="deb [arch=$(dpkg --print-architecture) signed-by=$REPO_KEY] https://baltocdn.com/helm/stable/debian/ all main"
+curl https://baltocdn.com/helm/signing.asc | sudo gpg --dearmor -o /usr/share/keyrings/helm.gpg
+echo "$REPO_CONF" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+apt update
+apt install helm
+helm repo add nvdp https://nvidia.github.io/k8s-device-plugin
+helm repo update
+VER=0.15.1
+helm upgrade -i nvdp nvdp/nvidia-device-plugin \
+  --version $VER \
+  --namespace nvidia-device-plugin \
+  --create-namespace \
+  --set compatWithCPUManager=true \
+  --set gfd.enabled=true
+#deploy prometheus
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update prometheus-community
+helm install kube-prom-stack prometheus-community/kube-prometheus-stack \
+    --namespace prometheus \
+    --create-namespace
+#deploy metrics-server
+helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+helm repo update metrics-server
+cat <<EOF | tee metrics-server.yaml
+args:
+- --kubelet-insecure-tls
+- --kubelet-preferred-address-types=InternalIP
+EOF
+helm install metrics-server metrics-server/metrics-server --namespace kube-system -f metrics-server.yaml
+
+#create storage class
+apt install nfs-common -y
+helm repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+NASIP=120.126.23.246
+NASPATH=/volume1/dev
+helm install nfs-subdir-external-provisioner nfs-subdir-external-provisioner/nfs-subdir-external-provisioner \
+    --namespace kflow-storage \
+    --create-namespace \
+    --set nfs.server=120.126.23.246 \
+    --set nfs.path=/volume1/dev \
+    --version 4.0.13
+kubectl annotate sc nfs-client storageclass.kubernetes.io/is-default-class=true
+
+#deploy kustomize

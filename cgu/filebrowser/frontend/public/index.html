@@ -181,6 +181,141 @@
       </div>
     </div>
 
+    <script>
+      // Inline auth check: if user visits a /share/* URL, verify auth before
+      // loading the SPA modules. If the auth proxy would return login HTML
+      // (or a 401/403), redirect to Dex with a redirect back to this URL.
+      (function () {
+        try {
+          // Prefer the oauth2-proxy start path so the proxy can add the
+          // correct client_id before delegating to Dex.
+          const oauthStart = `${window.location.origin}/oauth2/start`;
+          // Determine if we should run the share auth check. The app may be
+          // served under a BaseURL, so check both the configured BaseURL and
+          // any occurrence of '/share/' in the pathname.
+          const baseUrl = (window.location.href.split("/").slice(0, -2).join("/")) || "/";
+          const normalizedBase = baseUrl.replace(/\/+$/, "");
+          const sharePrefix = normalizedBase + "/share/";
+          const shouldCheck =
+            window.location.pathname.startsWith(sharePrefix) ||
+            window.location.pathname.includes("/share/");
+          console.debug("[inline-auth] pathname=", window.location.pathname, "base=", baseUrl, "shouldCheck=", shouldCheck);
+          if (!shouldCheck) return;
+
+          const checkAuth = async () => {
+            try {
+              const res = await fetch("/api/workgroup/exists", {
+                method: "GET",
+                credentials: "include",
+                headers: { Accept: "application/json, text/plain, */*" },
+              });
+              if (res.status === 401 || res.status === 403) return false;
+              const ct = (res.headers.get("content-type") || "").toLowerCase();
+              if (ct.includes("text/html")) return false;
+              return true;
+            } catch (e) {
+              // network error or CORS -> treat as unauthenticated
+              return false;
+            }
+          };
+
+          // Run the check and redirect if not authenticated. We use
+          // location.replace so the current page is replaced in history.
+          // If not authenticated, show a simple login link (do NOT
+          // automatically redirect through oauth2-proxy). We also remove
+          // the module script so the SPA won't attempt to load JS that
+          // would be intercepted by the auth proxy and cause MIME errors.
+          checkAuth().then((ok) => {
+            if (!ok) {
+              try {
+                // Remove the module script to avoid bootstrap attempts
+                // that will fail when static assets are intercepted.
+                const scripts = document.querySelectorAll('script[type="module"]');
+                scripts.forEach((s) => {
+                  const src = s.getAttribute('src') || '';
+                  if (src.includes('/src/main.ts') || src.includes('/assets/index')) {
+                    s.parentNode && s.parentNode.removeChild(s);
+                  }
+                });
+              } catch (e) {
+                console.warn('[inline-auth] failed to remove module script', e);
+              }
+
+              // Render a minimal login prompt that opens the protected bridge
+              // in a new tab and polls the API until a session exists. This
+              // avoids relying on the proxy's immediate redirect behavior.
+              const bridge = `${window.location.href.split("/").slice(0, 3).join("/")}/jupyter/api/auth-bridge?target=` + encodeURIComponent(window.location.href);
+              const container = document.createElement('div');
+              container.setAttribute('style', 'display:flex;align-items:center;justify-content:center;height:100vh;background:#f6f8fa;flex-direction:column;font-family:Arial,sans-serif;');
+              container.innerHTML = `
+                <div id="fb-auth-bridge-card" style="max-width:640px;text-align:center;padding:24px;border-radius:8px;background:white;box-shadow:0 6px 18px rgba(0,0,0,.08)">
+                  <h2 style="margin:0 0 8px">需要登入</h2>
+                  <p id="fb-auth-bridge-desc" style="color:#333;margin:0 0 16px">偵測到您尚未登入。按下按鈕會跳轉至登入畫面，完成後此頁會自動重新整理。</p>
+                  <button id="fb-login-btn" style="display:inline-block;padding:10px 18px;background:#2979ff;color:white;border-radius:4px;border:0;cursor:pointer">使用 Dex 登入</button>
+                  <p id="fb-login-status" style="margin-top:12px;color:#666;display:none"></p>
+                </div>
+              `;
+              document.body.innerHTML = '';
+              document.body.appendChild(container);
+
+              // When user clicks, open bridge in new tab and poll /api/workgroup/exists
+              const btn = document.getElementById('fb-login-btn');
+              const status = document.getElementById('fb-login-status');
+              let pollTimer = null;
+              let timeoutTimer = null;
+
+              const startPolling = () => {
+                if (status) { status.style.display = 'block'; status.textContent = '已開啟登入視窗，等待登入完成...'; }
+                let elapsed = 0;
+                pollTimer = window.setInterval(async () => {
+                  try {
+                    const res = await checkAuth();
+                    if (res) {
+                      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                      if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
+                      if (status) { status.textContent = '登入成功，正在重新整理...'; }
+                      window.location.reload();
+                    }
+                  } catch (e) {
+                    // ignore and retry
+                  }
+                  elapsed += 1;
+                }, 1000);
+
+                timeoutTimer = window.setTimeout(() => {
+                  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                  if (status) { status.textContent = '登入逾時，請手動關閉登入視窗並重試。'; }
+                }, 60000);
+              };
+
+              const startLogin = () => {
+                // Use same-tab navigation to avoid CSRF token/state being
+                // clobbered when opening multiple login tabs. This reduces
+                // oauth2-proxy CSRF failures.
+                try {
+                  window.location.replace(bridge);
+                } catch (e) {
+                  window.location.href = bridge;
+                }
+              };
+
+              if (btn) {
+                btn.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  startLogin();
+                });
+              }
+            }
+          });
+        } catch (e) {
+          // Fail open: if anything goes wrong here, don't block app load.
+          // The SPA will still try to bootstrap; infra-level fixes may be
+          // required if auth proxy behavior is inconsistent.
+          console.warn("inline auth check failed", e);
+        }
+      })();
+    </script>
+
     <script type="module" src="/src/main.ts"></script>
 
     [{[ if .CSS -]}]
