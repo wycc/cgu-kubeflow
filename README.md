@@ -10,5 +10,5 @@ Please refer to the official docs at [kubeflow.org](http://kubeflow.org).
 
 ## Releases
 
-* 2026-H1
+* [2026-H1](REL-2026-H1.md)
 
