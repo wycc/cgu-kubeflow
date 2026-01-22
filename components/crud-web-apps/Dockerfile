@@ -50,6 +50,7 @@ RUN pip3 install .
 WORKDIR /src
 COPY ./jupyter/backend/requirements.txt .
 RUN pip3 install -r requirements.txt
+RUN pip3 install cachetools
 
 COPY ./jupyter/backend/apps/ ./apps
 COPY ./jupyter/backend/entrypoint.py .

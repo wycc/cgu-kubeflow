@@ -56,7 +56,7 @@ spec:
           - /bin/sh
           args:
           - -c
-          - if [ ! -f /home/jovyan/.clonedone ]; then python /script.py {namespace} {templatePvcName} {destvolume}; touch /home/jovyan/.clonedone; sleep 365d; else sleep 365d; fi
+          - if [ ! -f /home/jovyan/.clonedone ]; then while [ ! -f /home/jovyan/Desktop/clone_100% ]; do python /script.py {namespace} {templatePvcName} {destvolume}; sleep 5; done; touch /home/jovyan/.clonedone; sleep 365d; else sleep 365d; fi
           volumeMounts:
           - mountPath: /source
             name: {templatePvcName}

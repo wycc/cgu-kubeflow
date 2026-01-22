@@ -2,7 +2,7 @@ from kubernetes import client, config
 import yaml
 import time,os
 import traceback
-import utils
+from . import utils
 
 from kubernetes.config.config_exception import ConfigException
 # Load the Kubernetes configuration
