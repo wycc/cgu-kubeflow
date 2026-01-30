@@ -1,0 +1,20 @@
+apiVersion: kubeflow.org/v1alpha1
+kind: PVCViewer
+metadata:
+  name: pvcviewer-sample-with-share
+  namespace: kubeflow-user-example-com
+spec:
+  # PVC to view
+  pvc: workspace-pvc
+  
+  # Networking configuration - when this is set, public share is automatically enabled
+  networking:
+    targetPort: 8080
+    basePrefix: /pvcviewers
+    rewrite: /
+  
+  # Optional: Enable RWO scheduling
+  rwoScheduling: true
+  
+  # PodSpec will use default FileBrowser configuration
+  # The webhook will automatically inject the PVC volume

@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= notebook-controller
+IMG ?= cguaicadmin/notebook-controller
 TAG ?= $(shell git describe --tags --always --dirty)
 ARCH ?= linux/amd64
 

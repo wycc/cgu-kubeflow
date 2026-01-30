@@ -159,6 +159,54 @@ def get_notebook_pod(notebook_name, namespace):
         raise NotFound("No pod detected.")
 
 
+@bp.route("/api/namespaces/<namespace>/notebooks/<notebook_name>/ssh-nodeport")
+def get_notebook_ssh_nodeport(notebook_name, namespace):
+    """Get the SSH NodePort for a notebook's service."""
+    try:
+        # Try to get service with notebook name as label selector
+        label_selector = "notebook-name=" + notebook_name
+        services = api.list_services(namespace=namespace, label_selector=label_selector)
+        
+        if not services.items:
+            # If no service found with label, try direct service name
+            # Common patterns: {notebook_name}, {notebook_name}-ssh
+            service_names = [notebook_name, f"{notebook_name}-ssh"]
+            service = None
+            for svc_name in service_names:
+                try:
+                    service = api.get_service(svc_name, namespace)
+                    if service:
+                        break
+                except:
+                    continue
+            
+            if not service:
+                raise NotFound(f"No service found for notebook {notebook_name}")
+        else:
+            service = services.items[0]
+        
+        # Find SSH port in service
+        ssh_nodeport = None
+        if service.spec and service.spec.ports:
+            for port in service.spec.ports:
+                # Check for SSH port (common names: ssh, SSH, or port 22)
+                if (port.name and port.name.lower() == "ssh") or port.port == 22:
+                    if port.node_port:
+                        ssh_nodeport = port.node_port
+                        break
+        
+        if ssh_nodeport is None:
+            raise NotFound(f"No SSH NodePort found in service for notebook {notebook_name}")
+        
+        return api.success_response("ssh_nodeport", ssh_nodeport)
+    
+    except NotFound as e:
+        raise e
+    except Exception as e:
+        log.error(f"Error getting SSH NodePort: {str(e)}")
+        raise NotFound(f"Error retrieving SSH NodePort: {str(e)}")
+
+
 @bp.route("/api/namespaces/<namespace>/notebooks/<notebook_name>/pod/<pod_name>/logs")  # noqa: E501
 def get_pod_logs(namespace, notebook_name, pod_name):
     container = notebook_name
