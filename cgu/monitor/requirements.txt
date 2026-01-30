@@ -1,2 +1,2 @@
-kubernetes==12.0.1
+kubernetes==26.1.0
 prometheus_client==0.9.0
