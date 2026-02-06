@@ -101,7 +101,7 @@ def track_copy_progress(filename, pid, start, amount):
 
                 # —— 新增：重建 current_clone_progress_is_{prog} 目錄
                 #    先移除舊的，再用最新的 prog（取整數）當名稱
-                os.system(f"cd /home/jovyan/ ; rm -rf clone_*; mkdir clone_{math.round(prog)}")
+                os.system(f"cd /home/jovyan/ ; rm -rf clone_* Desktop/clone_*; mkdir clone_{round(prog)}% Desktop/clone_{round(prog)}%")
 
                 # 印出進度
                 print(f"\r複製中 `{filename}` - {prog:5.1f}% ", end="")
@@ -169,23 +169,30 @@ for idx, fname in enumerate(filenames):
 
 # 6) 複製隱藏目錄 (.開頭)
 
-def has_unsupported_nodes(root_dir: str) -> bool:
-    """偵測是否含 socket/FIFO/裝置檔（File Station 會失敗的型別）"""
+def get_special_files(root_dir: str) -> list:
+    """取得特殊檔案列表（socket/FIFO/裝置檔等 File Station 會跳過的型別）"""
+    special_files = []
     for r, dirs, files in os.walk(root_dir):
         for name in files:
             p = os.path.join(r, name)
             try:
                 st = os.lstat(p)
             except Exception:
-                return True
+                # 無法讀取的檔案也視為特殊檔案
+                rel_path = os.path.relpath(p, root_dir)
+                special_files.append(rel_path)
+                continue
             m = st.st_mode
             if stat.S_ISSOCK(m) or stat.S_ISFIFO(m) or stat.S_ISCHR(m) or stat.S_ISBLK(m):
-                return True
+                rel_path = os.path.relpath(p, root_dir)
+                special_files.append(rel_path)
         # 也把 .gnupg/S.gpg-agent* 這類常見 socket 規避一下（保險）
         for name in ("S.gpg-agent", "S.gpg-agent.ssh", "S.gpg-agent.extra"):
-            if os.path.exists(os.path.join(r, name)):
-                return True
-    return False
+            socket_path = os.path.join(r, name)
+            if os.path.exists(socket_path):
+                rel_path = os.path.relpath(socket_path, root_dir)
+                special_files.append(rel_path)
+    return special_files
 
 def ensure_dirs_on_qnap(full_path: str):
     """在 QNAP 端逐層建立目錄（已存在就略過）"""
@@ -214,24 +221,8 @@ for d in hidden_dirs:
     print(f"開始複製隱藏目錄: {d} -> {dp}")
     ensure_dirs_on_qnap(dp)
 
-    if has_unsupported_nodes(d):
-        # Fallback：用 tar 打包（tar 會跳過 socket），搬到目的端後解壓
-        tar_name = f"{base}.tar.gz"
-        tar_src_abs = os.path.join(parent_src_abs, tar_name)
-        # 打包：在來源上層 -C parent ，僅打包該資料夾
-        try:
-            subprocess.run(
-                ["tar", "-czf", tar_src_abs,
-                 "-C", parent_src_abs,
-                 "--exclude=**/S.gpg-agent*", "--exclude=**/keyring-*/control",
-                 "--exclude=**/*.lock", "--exclude=**/tmp/*",
-                 base],
-                check=True
-            )
-        except subprocess.CalledProcessError as e:
-            print(f"打包 {d} 失敗：{e}")
-            continue
-
+    # 1) 先用 File Station API 複製整個目錄（API 會自動跳過特殊檔案）
+    print(f"使用 File Station API 複製一般檔案...")
     copy_url = (
         f"http://{qnap_ip}:8080/cgi-bin/filemanager/utilRequest.cgi?"
         f"func=copy&sid={auth_sid}&source_file={base}&source_total=1&"
@@ -241,8 +232,48 @@ for d in hidden_dirs:
     print_progress("複製 API 回應", res.status_code, res.reason)
     pid = res.json().get("pid")
     if pid:
-        start += amt
-        track_copy_progress(base, pid, start, amt)
+        start += amt * 0.7  # 給 API 複製 70% 的進度
+        track_copy_progress(base, pid, start, amt * 0.7)
+    
+    # 2) 檢查是否有特殊檔案需要額外處理
+    special_files = get_special_files(d)
+    if special_files:
+        print(f"發現 {len(special_files)} 個特殊檔案，使用 tar 處理...")
+        tar_name = f"{base}_special_{int(time.time())}.tar.gz"
+        tar_path = os.path.join("/tmp", tar_name)
+        
+        # 打包特殊檔案到 /tmp
+        try:
+            subprocess.run(
+                ["tar", "-czf", tar_path, "-C", d] + special_files,
+                check=True
+            )
+            print(f"特殊檔案打包完成: {tar_path}")
+            
+            # 直接在目標目錄解壓
+            target_dir = os.path.join(dp, base)
+            subprocess.run(
+                ["tar", "-xzf", tar_path, "-C", target_dir],
+                check=True
+            )
+            print(f"特殊檔案解壓完成到: {target_dir}")
+            
+            # 清理臨時 tar 檔案
+            try:
+                os.remove(tar_path)
+            except Exception:
+                pass
+                
+        except subprocess.CalledProcessError as e:
+            print(f"處理特殊檔案失敗：{e}")
+        
+        start += amt * 0.3  # 給特殊檔案處理剩餘 30% 的進度
+    else:
+        print("沒有特殊檔案需要額外處理")
+        start += amt * 0.3  # 沒有特殊檔案時，直接增加剩餘進度
+    
     time.sleep(1)
 
 print("所有檔案與隱藏目錄複製完成。")
+prog=100
+os.system(f"cd /home/jovyan/ ; rm -rf clone_* Desktop/clone_*; mkdir clone_{round(prog)}% Desktop/clone_{round(prog)}%")

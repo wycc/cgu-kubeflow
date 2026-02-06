@@ -29,10 +29,12 @@ export class OverviewComponent implements OnInit, OnDestroy {
   public configurations: Configuration[] = [];
   private podDefaults: PodDefault[];
   public envGroups: EnvironmentVariablesGroup[] = [];
+  private prvSshNodePort: number | null = null;
 
   private prvNotebook: NotebookRawObject;
   private prvPod: V1Pod;
   private pollSub = new Subscription();
+  private sshNodePortSub = new Subscription();
 
   @Input() notebookStatus: STATUS_TYPE;
 
@@ -44,6 +46,7 @@ export class OverviewComponent implements OnInit, OnDestroy {
     this.volGroups = this.generateVolGroups(nb);
     this.generatePodDefaults(nb);
     this.notebookEnv = this.generateEnv(nb);
+    this.fetchSshNodePort(nb);
   }
   get notebook(): NotebookRawObject {
     return this.prvNotebook;
@@ -234,17 +237,51 @@ export class OverviewComponent implements OnInit, OnDestroy {
     }
   }
 
+  get sshNodePort(): number | null {
+    return this.getSshNodePort();
+  }
+
+  getSshNodePort(): number | null {
+    return this.prvSshNodePort;
+  }
+
   constructor(
     public backend: JWABackendService,
     public poller: PollerService,
-  ) {}
+  ) { }
 
-  ngOnInit(): void {}
+  ngOnInit(): void { }
 
   ngOnDestroy(): void {
     if (this.pollSub) {
       this.pollSub.unsubscribe();
     }
+    if (this.sshNodePortSub) {
+      this.sshNodePortSub.unsubscribe();
+    }
+  }
+
+  private fetchSshNodePort(nb: NotebookRawObject) {
+    if (!nb?.metadata?.namespace || !nb?.metadata?.name) {
+      return;
+    }
+
+    this.sshNodePortSub.unsubscribe();
+
+    const request = this.backend.getNotebookSshNodePort(
+      nb.metadata.namespace,
+      nb.metadata.name
+    );
+
+    this.sshNodePortSub = request.subscribe(
+      nodePort => {
+        this.prvSshNodePort = nodePort;
+      },
+      error => {
+        // Silently handle error - SSH NodePort may not be available
+        this.prvSshNodePort = null;
+      }
+    );
   }
 
   private generatePodDefaults(nb: NotebookRawObject) {
