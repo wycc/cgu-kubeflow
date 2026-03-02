@@ -1,115 +1,444 @@
-# Kubeflow Notebook SSH Controller
+# Notebook SSH Controller
 
-## 概觀
+一個 Kubernetes Operator，用於自動為 Kubeflow Notebook 建立 SSH 存取服務，並配置 Istio 流量規則，讓使用者能透過 SSH 直接連線至 Notebook Pod。
 
-`notebook-ssh-controller` 是一個 Kubernetes 控制器，專為 Kubeflow 設計。它的主要功能是監控在 `kubeflow` 命名空間中建立的 `Notebook` 自訂資源。當一個新的 `Notebook` 被建立或更新時，這個控制器會自動為其建立一個 `NodePort` 類型的 `Service`，以便將 `Notebook` 容器內的 `sshd` 服務暴露到 Kubernetes 叢集外部。
+透過在 Notebook 上設定 **Label**（`cgu.kubeflow.org/sshservice: "true"`）即可啟用或停用 SSH Service，方便在 Kubeflow UI 中以標籤控制，無需手動建立任何 Kubernetes 資源。
 
-這個控制器解決了在 Kubeflow Notebook 中運行 `sshd` 服務時，需要手動設定網路連線的問題，讓使用者可以更方便地透過 SSH 連線到他們的 Notebook 環境。
+---
 
-## 功能
+## 目錄
 
-*   **自動建立 `NodePort` Service**：監控 `Notebook` 資源，並為其第二個容器埠口（預設為 `sshd`）建立一個 `NodePort` Service。
-*   **服務生命週期管理**：當 `Notebook` 被刪除時，自動清理對應的 `Service`。
-*   **狀態同步**：確保 `Service` 的設定與 `Notebook` 的狀態保持一致。
+- [專案概述](#專案概述)
+- [架構說明](#架構說明)
+- [運作原理](#運作原理)
+  - [NotebookReconciler（SSH Service 管理）](#notebookreconcilerssh-service-管理)
+  - [StatefulSetReconciler（Istio 流量排除）](#statefulsetreconcileristio-流量排除)
+- [前置需求](#前置需求)
+- [快速開始](#快速開始)
+  - [建構 Docker 映像檔](#建構-docker-映像檔)
+  - [部署到 Kubernetes 叢集](#部署到-kubernetes-叢集)
+  - [移除部署](#移除部署)
+- [設定說明](#設定說明)
+  - [啟用 SSH Service](#啟用-ssh-service)
+  - [讀取指派的 NodePort](#讀取指派的-nodeport)
+  - [停用 SSH Service](#停用-ssh-service)
+  - [Controller 啟動參數](#controller-啟動參數)
+- [常數與 API 參照](#常數與-api-參照)
+- [RBAC 權限](#rbac-權限)
+- [目錄結構](#目錄結構)
+- [技術細節](#技術細節)
+- [開發指南](#開發指南)
 
-## 開始使用
+---
 
-### 先決條件
+## 專案概述
 
-*   一個正在運行的 Kubernetes 叢集。
-*   已安裝 Kubeflow，特別是 `notebook-controller`。
-*   `kubectl` 已設定並連線到您的叢集。
-*   已安裝 Docker。
-*   已安裝 Go (版本 1.23 或更高)。
-*   已安裝 `kustomize`。
+Kubeflow Notebook 預設只對外暴露 HTTP 服務（如 JupyterLab），不提供 SSH 存取。此 Controller 以 **Label 驅動** 的方式，自動完成以下工作：
 
-### 建置
+1. **建立 NodePort Service**：讓外部使用者可透過 SSH 連線到 Notebook Pod（容器 Port 22，Service Port 2222）。
+2. **回寫 NodePort 至 Notebook Annotation**：讓 Kubeflow UI 可直接讀取並顯示給使用者，無需手動查詢。
+3. **設定 Istio 排除規則**：在 StatefulSet 的 Pod Template 上加入 Annotation，讓 Istio Sidecar（Envoy Proxy）略過對 SSH 流量的攔截，確保 SSH 連線正常運作。
 
-1.  **Clone 專案**
+---
 
-    ```bash
-    git clone https://github.com/kubeflow/notebook-ssh-controller.git
-    cd notebook-ssh-controller
-    ```
+## 架構說明
 
-2.  **整理依賴**
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     Kubernetes Cluster                         │
+│                                                                │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │            notebook-ssh-controller (Operator)            │  │
+│  │                                                          │  │
+│  │  ┌────────────────────────┐  ┌──────────────────────┐  │  │
+│  │  │   NotebookReconciler   │  │StatefulSetReconciler  │  │  │
+│  │  │                        │  │                       │  │  │
+│  │  │ 監聽 Notebook CRD      │  │ 監聽 StatefulSet      │  │  │
+│  │  │ 依 Label 建立/刪除     │  │ 查父 Notebook Label   │  │  │
+│  │  │ SSH NodePort Service   │  │ 管理 Istio 排除規則   │  │  │
+│  │  │ 回寫 NodePort Annotation│  │                      │  │  │
+│  │  └────────────┬───────────┘  └──────────┬────────────┘  │  │
+│  └───────────────┼────────────────────────--┼───────────────┘  │
+│                  │                           │                   │
+│     ┌────────────▼──────────┐   ┌───────────▼──────────────┐  │
+│     │  Notebook (CRD)        │   │  StatefulSet             │  │
+│     │  Labels:               │   │  Pod Template Annotation:│  │
+│     │   cgu.kubeflow.org/    │   │  excludeInboundPorts=22  │  │
+│     │   sshservice: "true"   │   └──────────────────────────┘  │
+│     │  Annotations:          │                                   │
+│     │   cgu.kubeflow.org/    │                                   │
+│     │   ssh-nodeport:"31234" │                                   │
+│     └────────────┬───────────┘                                   │
+│                  │                                                │
+│     ┌────────────▼──────────────┐                               │
+│     │  SSH Service (NodePort)    │                               │
+│     │  <notebook>-ssh-service    │                               │
+│     │  Port: 2222 → 22           │                               │
+│     └────────────────────────────┘                               │
+└──────────────────────────────────────────────────────────────────┘
+```
 
-    ```bash
-    go mod tidy
-    ```
+---
 
-3.  **建置 Docker 映像**
+## 運作原理
 
-    使用 `Makefile` 中的指令來建置控制器映像。您可以自訂映像名稱和標籤。
+### NotebookReconciler（SSH Service 管理）
 
-    ```bash
-    make docker-build IMG=<your-registry>/notebook-ssh-controller:latest
-    ```
+檔案：[`controllers/notebook_controller.go`](controllers/notebook_controller.go)
 
-4.  **推送 Docker 映像**
+監聽 `kubeflow.org/v1beta1` 的 `Notebook` 資源，依 Label 執行以下協調邏輯：
 
-    將建置好的映像推送到您的容器映像庫。
+| Notebook Label 狀態 | Service 存在？ | 行為 |
+|---------------------|---------------|------|
+| `sshservice: "true"` | 否 | 建立 NodePort SSH Service，Requeue 等待 NodePort 指派 |
+| `sshservice: "true"` | 是 | 讀取 NodePort，回寫至 Notebook Annotation |
+| 未設定或非 `"true"` | 是 | 刪除 Service，清除 Notebook Annotation |
+| 未設定或非 `"true"` | 否 | 無操作（已達期望狀態） |
+| Notebook 正在刪除 | 任意 | 由 OwnerReference 機制自動清理 Service |
 
-    ```bash
-    docker push <your-registry>/notebook-ssh-controller:latest
-    ```
+**建立的 Service 固定規格：**
 
-### 部署
+| 欄位 | 值 |
+|------|----|
+| 名稱 | `<notebook-name>-ssh-service` |
+| 類型 | `NodePort` |
+| Service Port | `2222` |
+| 目標 Container Port | `22` |
+| Protocol | `TCP` |
+| Selector | `notebook-name=<notebook-name>` |
+| OwnerReference | 指向對應 Notebook |
 
-1.  **更新部署配置**
+**回寫的 Annotation：**
 
-    在部署之前，您需要更新位於 `config/manager/manager.yaml` 的部署配置，將映像名稱改為您剛剛推送的映像。
+| Annotation Key | 範例值 | 說明 |
+|----------------|--------|------|
+| `cgu.kubeflow.org/ssh-nodeport` | `"31234"` | Kubernetes 指派的 NodePort，供 UI 顯示 |
 
-2.  **部署控制器**
+### StatefulSetReconciler（Istio 流量排除）
 
-    使用 `make deploy` 指令將控制器部署到您的 Kubernetes 叢集。這會建立所有必要的資源，包括 `Deployment`、`ServiceAccount`、`ClusterRole` 和 `ClusterRoleBinding`。
+檔案：[`controllers/statefulset_controller.go`](controllers/statefulset_controller.go)
 
-    ```bash
-    make deploy IMG=<your-registry>/notebook-ssh-controller:latest
-    ```
+監聽所有 `StatefulSet`，針對 Kubeflow Notebook 建立的 StatefulSet，透過 **OwnerReference 查詢父 Notebook** 是否啟用 SSH。
 
-### 驗證
+**判斷 Notebook StatefulSet 的條件（符合任一）：**
+- Label 含有 `notebook-name`
+- Label `app.kubernetes.io/component=notebook`
+- Label `kubeflow-resource-type=notebook`
+- OwnerReference 的 Kind 為 `Notebook`（APIVersion `kubeflow.org/v1beta1`）
 
-1.  **檢查 Controller Pod**
+**處理流程：**
 
-    確認 `notebook-ssh-controller` 的 pod 是否正在 `notebook-ssh-controller-system` 命名空間中運行。
+| 父 Notebook Label | Istio Annotation 存在？ | 行為 |
+|-------------------|------------------------|------|
+| `sshservice: "true"` | 否 | 新增排除 Annotation |
+| `sshservice: "true"` | 是 | 無操作 |
+| 未啟用 | 是 | 移除排除 Annotation |
+| 未啟用 | 否 | 無操作 |
 
-    ```bash
-    kubectl get pods -n notebook-ssh-controller-system
-    ```
+加入的 Annotation（位於 `StatefulSet.spec.template.metadata.annotations`）：
 
-2.  **建立一個新的 Notebook**
+```yaml
+traffic.sidecar.istio.io/excludeInboundPorts: "22"
+```
 
-    在 Kubeflow UI 中建立一個新的 Notebook，並確保其容器規格中有兩個埠口，其中第二個是 SSH 埠。
+---
 
-3.  **檢查 Service**
+## 前置需求
 
-    在 Notebook 建立後，檢查是否有名為 `<notebook-name>-ssh` 的 `Service` 被自動建立在與 Notebook 相同的命名空間中。
+| 軟體 | 最低版本 |
+|------|----------|
+| Go | 1.23 |
+| Kubernetes | 1.23+ |
+| Kubeflow（含 Notebook Controller） | 需已安裝 |
+| Istio（選用） | 若使用 Istio 服務網格則需要 |
+| Docker | 任意版本（用於建構映像檔） |
+| kubectl | 1.23+ |
 
-    ```bash
-    kubectl get service -n <notebook-namespace>
-    ```
+---
 
-    您應該會看到一個 `NodePort` 類型的 Service，並可以從輸出中取得節點埠。
+## 快速開始
 
-## 開發
+### 建構 Docker 映像檔
 
-如果您想為這個控制器貢獻，請參考以下指令：
+```bash
+# 建構映像檔（預設版本 1.1.0）
+make docker-build
 
-*   `make run`：在本地機器上以開發模式運行控制器。
-*   `make test`：運行單元測試。
+# 指定版本號
+make docker-build VER=1.2.0
 
-## 未來功能
+# 推送映像檔到 Registry
+make docker-push
 
-### 在 Kubeflow UI 中整合 SSH 開關
+# 推送指定版本
+make docker-push VER=1.2.0
+```
 
-一個理想的增強功能是在 Kubeflow 的 Notebook 建立頁面中，直接提供一個「啟用 SSH」的選項。這將允許使用者為每個 Notebook 獨立地決定是否要開啟 SSH 連線。
+映像檔標籤格式：`cguaicadmin/notebook-ssh-controller:<VERSION>`
 
-要實現這個功能，需要修改 Kubeflow 的前端，讓「啟用 SSH」的選項能夠動態地在 Notebook 的容器規格中，加入或移除 `sshd` 的埠口設定。
+### 部署到 Kubernetes 叢集
 
-*   **修改 Kubeflow 前端**：
-    *   修改 Kubeflow 的 Notebook 管理介面，在建立和編輯 Notebook 的表單中，加入一個「啟用 SSH」的核取方塊。
-    *   當使用者勾選該選項時，前端程式碼會在送出給後端的 `Notebook` 物件中，自動加入一個代表 `sshd` 服務的 `containerPort`（例如，埠口 `22`）。
-    *   當使用者取消勾選時，則移除該埠口設定。
+Controller 將部署到 `cgu` Namespace。
 
-這個方法的優點是不需要修改 Kubeflow 的 Notebook CRD，只需要修改前端介面即可。`notebook-ssh-controller` 不需要做任何變更，它會自動根據是否存在第二個埠口，來建立或刪除對應的 SSH `Service`。
+```bash
+# 確認 Namespace 存在
+kubectl create namespace cgu --dry-run=client -o yaml | kubectl apply -f -
+
+# 套用 RBAC 設定
+kubectl apply -f config/rbac/role.yaml
+kubectl apply -f config/rbac/role_binding.yaml
+
+# 部署 Controller
+make deploy
+```
+
+確認部署狀態：
+
+```bash
+kubectl get deployment -n cgu notebook-ssh-controller-manager
+kubectl get pods -n cgu -l control-plane=controller-manager
+```
+
+### 移除部署
+
+```bash
+make undeploy
+```
+
+---
+
+## 設定說明
+
+### 啟用 SSH Service
+
+在 Notebook 資源的 `metadata.labels` 加入以下 Label，Controller 就會自動建立 SSH NodePort Service：
+
+```yaml
+apiVersion: kubeflow.org/v1beta1
+kind: Notebook
+metadata:
+  name: my-notebook
+  namespace: user-namespace
+  labels:
+    cgu.kubeflow.org/sshservice: "true"   # ← 加上這個 Label 即可啟用
+spec:
+  template:
+    spec:
+      containers:
+        - name: my-notebook
+          image: your-notebook-image-with-sshd:latest
+          # 不需要宣告第二個 Port，Controller 固定使用 Port 22
+```
+
+> **注意**：Notebook 的容器映像檔必須已安裝並啟動 SSH Daemon（`sshd`），並監聽 Port **22**。
+
+Controller 會自動建立以下 Service（無需手動建立）：
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-notebook-ssh-service
+  namespace: user-namespace
+  ownerReferences:
+    - apiVersion: kubeflow.org/v1beta1
+      kind: Notebook
+      name: my-notebook
+spec:
+  type: NodePort
+  selector:
+    notebook-name: my-notebook
+  ports:
+    - name: tcp-ssh
+      protocol: TCP
+      port: 2222
+      targetPort: 22
+      nodePort: <系統自動指派>
+```
+
+### 讀取指派的 NodePort
+
+Service 建立後，Controller 會自動將 NodePort 回寫至 Notebook 的 Annotation：
+
+```bash
+# 查詢已指派的 NodePort
+kubectl get notebook my-notebook -n user-namespace \
+  -o jsonpath='{.metadata.annotations.cgu\.kubeflow\.org/ssh-nodeport}'
+```
+
+使用者透過 SSH 連線：
+
+```bash
+# 取得任一 Node 的 IP
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+
+# 取得 NodePort
+NODE_PORT=$(kubectl get notebook my-notebook -n user-namespace \
+  -o jsonpath='{.metadata.annotations.cgu\.kubeflow\.org/ssh-nodeport}')
+
+# 連線
+ssh -p ${NODE_PORT} user@${NODE_IP}
+```
+
+### 停用 SSH Service
+
+移除 Label 或將值改為非 `"true"` 即可停用：
+
+```bash
+# 方法一：移除 Label
+kubectl label notebook my-notebook -n user-namespace cgu.kubeflow.org/sshservice-
+
+# 方法二：設為 false
+kubectl label notebook my-notebook -n user-namespace cgu.kubeflow.org/sshservice=false --overwrite
+```
+
+Controller 會自動刪除 SSH Service，並清除 `cgu.kubeflow.org/ssh-nodeport` Annotation。
+
+### Controller 啟動參數
+
+| 參數 | 預設值 | 說明 |
+|------|--------|------|
+| `--metrics-bind-address` | `127.0.0.1:8080` | Prometheus Metrics 端點位址 |
+| `--health-probe-bind-address` | `:8081` | 健康檢查端點位址 |
+| `--leader-elect` | `false` | 啟用 Leader Election（多副本高可用時使用） |
+
+健康檢查端點：
+- **存活探針（Liveness）**：`GET /healthz`
+- **就緒探針（Readiness）**：`GET /readyz`
+
+---
+
+## 常數與 API 參照
+
+定義於 [`controllers/constants.go`](controllers/constants.go)：
+
+| 常數名稱 | 值 | 說明 |
+|----------|----|------|
+| `SSHServiceLabel` | `cgu.kubeflow.org/sshservice` | 啟用 SSH Service 的 Label Key |
+| `SSHNodePortAnnotation` | `cgu.kubeflow.org/ssh-nodeport` | 回寫 NodePort 的 Annotation Key |
+| `IstioExcludePortAnnotation` | `traffic.sidecar.istio.io/excludeInboundPorts` | Istio 流量排除 Annotation Key |
+| `SSHContainerPort` | `22` | 容器內 SSH Daemon 監聽的 Port |
+| `SSHServicePort` | `2222` | Service 對外的 Port |
+| `IstioExcludePortValue` | `"22"` | 排除的 Istio 攔截 Port 字串 |
+
+---
+
+## RBAC 權限
+
+Controller 需要以下 Kubernetes RBAC 權限（定義於 [`config/rbac/role.yaml`](config/rbac/role.yaml)）：
+
+| 資源群組 | 資源 | 權限 |
+|----------|------|------|
+| `kubeflow.org` | `notebooks` | get, list, watch, update, patch |
+| `kubeflow.org` | `notebooks/status` | get, update, patch |
+| `kubeflow.org` | `notebooks/finalizers` | update |
+| `""` (core) | `services` | get, list, watch, create, update, patch, delete |
+| `apps` | `statefulsets` | get, list, watch, update, patch |
+| `apps` | `statefulsets/status` | get, update, patch |
+| `""` (core) | `configmaps` | get, list, watch, create, update, patch, delete |
+| `coordination.k8s.io` | `leases` | get, list, watch, create, update, patch, delete |
+| `""` (core) | `events` | create, patch |
+
+---
+
+## 目錄結構
+
+```
+notebook-ssh-controller/
+├── main.go                          # 程式進入點，初始化並啟動 Controller Manager
+├── go.mod                           # Go 模組定義
+├── go.sum                           # Go 依賴鎖定檔
+├── Dockerfile                       # 多階段建構的 Docker 映像檔定義
+├── Makefile                         # 常用指令集（建構、部署、測試）
+├── OperatorPattern.md               # Kubernetes Operator 模式說明文件
+├── README.md                        # 本文件
+├── controllers/
+│   ├── constants.go                 # 共用常數（Label、Annotation、Port 定義）
+│   ├── notebook_controller.go       # NotebookReconciler：依 Label 管理 SSH Service 與回寫 NodePort
+│   └── statefulset_controller.go   # StatefulSetReconciler：依父 Notebook Label 管理 Istio 排除規則
+└── config/
+    ├── manager/
+    │   ├── manager.yaml             # Controller Deployment 設定
+    │   └── kustomization.yaml       # Kustomize 設定
+    └── rbac/
+        ├── role.yaml                # ClusterRole 權限定義
+        └── role_binding.yaml        # ClusterRoleBinding 設定
+```
+
+---
+
+## 技術細節
+
+### 技術棧
+
+| 技術 | 版本 | 用途 |
+|------|------|------|
+| Go | 1.23 | 主要開發語言 |
+| [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime) | v0.11.2 | Kubernetes Controller 框架 |
+| [kubeflow/notebook-controller](https://github.com/kubeflow/kubeflow) | v1beta1 | Notebook CRD API |
+| k8s.io/api | v0.23.5 | Kubernetes API 型別定義 |
+| k8s.io/client-go | v0.23.5 | Kubernetes 客戶端 |
+
+### 映像檔說明
+
+使用多階段建構（Multi-stage Build）：
+
+1. **Builder Stage**（`golang:1.23`）：編譯 Go 程式，產生靜態連結的二進位檔案 `manager`
+2. **Runtime Stage**（`gcr.io/distroless/static:nonroot`）：最小化 distroless 映像檔，以非 root 使用者（UID 65532）執行，提升安全性
+
+### 設計決策
+
+- **Label 驅動**：使用 Notebook Label 決定是否啟用 SSH，讓 Kubeflow UI 只需操作 Label 即可控制 SSH Service 的生命週期。
+- **固定 Port**：容器 Port 固定為 22，Service Port 固定為 2222，所有使用同一映像檔的 Notebook 行為一致，無需額外設定。
+- **NodePort 回寫**：Service 建立後自動將系統指派的 NodePort 回寫至 Notebook Annotation（`cgu.kubeflow.org/ssh-nodeport`），避免使用者手動查詢。回寫時設有值比較，相同值不觸發 Update，防止協調循環無限重複。
+- **OwnerReference 清理**：SSH Service 設定 Notebook 為擁有者，刪除 Notebook 時 Service 自動被 Kubernetes GC 回收，無需額外清理邏輯。
+- **Istio 整合**：透過在 StatefulSet Pod Template 加入 `traffic.sidecar.istio.io/excludeInboundPorts: "22"` Annotation，確保 Istio Sidecar 不干擾 SSH 流量的直通連線。
+
+### Operator 模式
+
+本專案遵循 Kubernetes Operator Pattern 實作，詳細說明請參考 [`OperatorPattern.md`](OperatorPattern.md)。
+
+---
+
+## 開發指南
+
+### 本地執行
+
+```bash
+# 安裝依賴
+go mod download
+
+# 確保 kubeconfig 已設定（指向目標叢集）
+export KUBECONFIG=~/.kube/config
+
+# 直接執行（不打包 Docker）
+go run main.go --metrics-bind-address=":8080" --health-probe-bind-address=":8081"
+```
+
+### 執行測試
+
+```bash
+make test
+
+# 查看覆蓋率報告
+go tool cover -html=cover.out
+```
+
+### 清理建構產出
+
+```bash
+make clean
+```
+
+### 更新版本
+
+編輯 [`Makefile`](Makefile) 中的 `VER` 變數，並同步更新 [`config/manager/manager.yaml`](config/manager/manager.yaml) 中的 `image` 欄位：
+
+```makefile
+VER ?= 1.2.0  # 更新此處
+```
+
+```yaml
+# config/manager/manager.yaml
+image: cguaicadmin/notebook-ssh-controller:1.2.0  # 同步更新此處
+```
