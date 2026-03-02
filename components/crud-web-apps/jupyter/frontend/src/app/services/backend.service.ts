@@ -102,6 +102,18 @@ export class JWABackendService extends BackendService {
     );
   }
 
+  public getNotebookSshNodePort(
+    namespace: string,
+    notebookName: string,
+  ): Observable<number | null> {
+    const url = `api/namespaces/${namespace}/notebooks/${notebookName}/ssh-nodeport`;
+
+    return this.http.get<JWABackendResponse>(url).pipe(
+      catchError(error => this.handleErrorExtended(error, [404])),
+      map((resp: JWABackendResponse) => resp.ssh_nodeport || null),
+    );
+  }
+
   public getConfig(): Observable<Config> {
     const url = `api/config`;
 

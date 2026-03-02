@@ -102,23 +102,22 @@ const jupyterUrl = computed(() => {
 
 const sendPutRequest = async () => {
   const path = window.location.href.split("/").slice(7, -1).join("/");
-  const response = await fetch(fileUrl.value, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify({
-      url: jupyterUrl.value + "/" + props.name,
-      type: "file",
-      name: props.name,
-      path: "/home/jovyan/",
-      // content: btoa(unescape(encodeURIComponent(String(props.content)))),
-      content: String(props.content),
-    }),
-  });
-  console.log(await response.text());
-  window.location.href = jupyterUrl.value.split("/").slice(0, 4).join("/") + "/" + window.location.href.split("/")[4] + "/editor/lab/tree/" + props.name;
+  // const response = await fetch(fileUrl.value, {
+  //   method: "PUT",
+  //   headers: {
+  //     "Content-Type": "application/json",
+  //   },
+  //   credentials: "include",
+  //   body: JSON.stringify({
+  //     url: jupyterUrl.value + "/" + props.name,
+  //     type: "file",
+  //     name: props.name,
+  //     path: "/home/jovyan/",
+  //     content: String(props.content),
+  //   }),
+  // });
+  // console.log(await response.text());
+  window.location.href = jupyterUrl.value.split("/").slice(0, 4).join("/") + "/" + window.location.href.split("/").slice(4, 6).join("/") + "/lab/tree/" + props.name;
 };
 
 </script>

@@ -50,7 +50,7 @@ import (
 
 const DefaultContainerPort = 8888
 const DefaultServingPort = 80
-const DefaultTCPPort = 8000
+const DefaultSSHPort = 22
 const AnnotationRewriteURI = "notebooks.kubeflow.org/http-rewrite-uri"
 const AnnotationHeadersRequestSet = "notebooks.kubeflow.org/http-headers-request-set"
 
@@ -432,8 +432,8 @@ func generateStatefulSet(instance *v1beta1.Notebook) *appsv1.StatefulSet {
 				Protocol:      "TCP",
 			},
 			{
-				ContainerPort: DefaultTCPPort,
-				Name:          "tcp-8000",
+				ContainerPort: DefaultSSHPort,
+				Name:          "ssh-port",
 				Protocol:      "TCP",
 			},
 		}
@@ -482,7 +482,7 @@ func generateService(instance *v1beta1.Notebook) *corev1.Service {
 			Namespace: instance.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     "ClusterIP",
+			Type:     "NodePort",
 			Selector: map[string]string{"statefulset": instance.Name},
 			Ports: []corev1.ServicePort{
 				{
@@ -494,9 +494,9 @@ func generateService(instance *v1beta1.Notebook) *corev1.Service {
 				},
 				{
 					// TCP port 8000 for inter-pod communication
-					Name:       "tcp-8000-" + instance.Name,
-					Port:       DefaultTCPPort,
-					TargetPort: intstr.FromInt(DefaultTCPPort),
+					Name:       "ssh-" + instance.Name,
+					Port:       DefaultSSHPort,
+					TargetPort: intstr.FromInt(DefaultSSHPort),
 					Protocol:   "TCP",
 				},
 			},

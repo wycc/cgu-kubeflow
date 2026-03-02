@@ -47,6 +47,7 @@ func NewHandler(
 	r.NotFoundHandler = index
 
 	api := r.PathPrefix("/api").Subrouter()
+	share := r.PathPrefix("/share").Subrouter()
 
 	tokenExpirationTime := server.GetTokenExpirationTime(DefaultTokenExpirationTime)
 	api.Handle("/login", monkey(loginHandler(tokenExpirationTime), ""))
@@ -91,7 +92,13 @@ func NewHandler(
 	public := api.PathPrefix("/public").Subrouter()
 	public.PathPrefix("/dl").Handler(monkey(publicDlHandler, "/api/public/dl/")).Methods("GET")
 	public.PathPrefix("/share").Handler(monkey(publicShareHandler, "/api/public/share/")).Methods("GET")
-	public.PathPrefix("/file").Handler(monkey(fileHandler, "/api/public/file/")).Methods("PUT")
+	public.PathPrefix("/file").Handler(monkey(fileHandler, "/api/file/copy")).Methods("PUT")
+
+	// share.PathPrefix("/file").Handler(monkey(fileHandler, "/share/file/")).Methods("PUT")
+	share.PathPrefix("/dl").Handler(monkey(publicDlHandler, "/share/dl/")).Methods("GET")
+	share.PathPrefix("/share").Handler(monkey(publicShareHandler, "/share/share/")).Methods("GET")
+	// share.PathPrefix("/static").Handler(static)
+	share.HandleFunc("/user", GetUserNamespaceHandler).Methods("GET")
 
 	return stripPrefix(server.BaseURL, r), nil
 }
