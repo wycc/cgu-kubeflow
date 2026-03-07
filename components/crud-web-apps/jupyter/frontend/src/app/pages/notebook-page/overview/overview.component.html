@@ -24,6 +24,15 @@
   {{ notebookType }}
 </lib-details-list-item>
 
+<lib-details-list-item
+  *ngIf="cpuRequests || cpuLimits || memoryRequests || memoryLimits"
+  key="Resources"
+>
+  <button mat-button type="button" class="resource-inline-edit-button">
+    Inline Edit
+  </button>
+</lib-details-list-item>
+
 <lib-details-list-item *ngIf="cpuRequests" key="Minimum CPU">
   {{ cpuRequests }}
 </lib-details-list-item>
