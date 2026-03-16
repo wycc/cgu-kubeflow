@@ -14,7 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	notebookv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1beta1" // 引入 Kubeflow Notebook API
+	notebookv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1beta1"
 )
 
 // NotebookReconciler reconciles a Notebook object
@@ -28,86 +28,71 @@ type NotebookReconciler struct {
 //+kubebuilder:rbac:groups=kubeflow.org,resources=notebooks/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify Reconcile to be able to reconcile your custom objects.
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
+// Reconcile 監聽 Notebook 資源的變化，根據是否帶有 SSHServiceLabel 決定是否建立或刪除
+// SSH NodePort Service，並在 Service 建立後將指派的 NodePort 回寫至 Notebook Annotation。
 func (r *NotebookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
-	// Fetch the Notebook instance
+	// 取得 Notebook 實例
 	notebook := &notebookv1.Notebook{}
 	if err := r.Get(ctx, req.NamespacedName, notebook); err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			return ctrl.Result{}, client.IgnoreNotFound(err)
+			return ctrl.Result{}, err
 		}
-		// Notebook not found, could be deleted
+		// Notebook 已不存在（可能已被刪除），忽略
 		return ctrl.Result{}, nil
 	}
 
-	// Check if the Notebook is being deleted
+	// 若 Notebook 正在刪除中，由 OwnerReference 機制自動清理 Service
 	if !notebook.ObjectMeta.DeletionTimestamp.IsZero() {
-		// Notebook is being deleted, clean up associated resources if any
-		// For now, we rely on owner reference for Service deletion
 		return ctrl.Result{}, nil
 	}
 
-	// Extract the second port from the Notebook's containers
-	sshPort := int32(0)
-	if len(notebook.Spec.Template.Spec.Containers) > 0 && len(notebook.Spec.Template.Spec.Containers[0].Ports) > 1 {
-		sshPort = notebook.Spec.Template.Spec.Containers[0].Ports[1].ContainerPort
-	}
+	// 判斷是否啟用 SSH Service（依 Label 決定）
+	sshEnabled := notebook.Labels[SSHServiceLabel] == "true"
 
-	// Define the desired SSH Service
+	// 查詢對應的 SSH Service 是否已存在
 	serviceName := fmt.Sprintf("%s-ssh-service", notebook.Name)
 	service := &corev1.Service{}
-	err := r.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: notebook.Namespace}, service)
+	getErr := r.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: notebook.Namespace}, service)
 
-	if sshPort == 0 {
-		// If SSH port is not defined, ensure the service is deleted
-		if err == nil {
-			// Service exists, so we need to delete it
-			log.Log.Info("SSH port is not defined for this Notebook, deleting existing Service", "Notebook", notebook.Name)
+	if !sshEnabled {
+		// 未啟用 SSH：若 Service 存在則刪除，並清除回寫的 NodePort Annotation
+		if getErr == nil {
+			logger.Info("SSH label 未設定，刪除 SSH Service", "Notebook", notebook.Name, "Service", serviceName)
 			if err := r.Delete(ctx, service); err != nil {
-				log.Log.Error(err, "Failed to delete SSH Service")
+				logger.Error(err, "刪除 SSH Service 失敗")
 				return ctrl.Result{}, err
 			}
 		}
-		// If service doesn't exist, we are in the desired state.
+		// 清除 Notebook 上的 NodePort Annotation
+		if err := r.clearSSHNodePortAnnotation(ctx, notebook); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{}, nil
 	}
 
-	// SSH port is defined, proceed with Service creation/update
-	if err != nil {
-		if client.IgnoreNotFound(err) == nil {
-			// Service does not exist, create it
-			service = r.newSSHServiceForNotebook(notebook, sshPort)
-			log.Log.Info("Creating a new SSH Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
-			if err := r.Create(ctx, service); err != nil {
-				log.Log.Error(err, "Failed to create new SSH Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
+	// 已啟用 SSH：確保 Service 存在
+	if getErr != nil {
+		if client.IgnoreNotFound(getErr) == nil {
+			// Service 不存在，建立新的 SSH Service
+			newService := r.newSSHServiceForNotebook(notebook)
+			logger.Info("建立 SSH Service", "Service.Namespace", newService.Namespace, "Service.Name", newService.Name)
+			if err := r.Create(ctx, newService); err != nil {
+				logger.Error(err, "建立 SSH Service 失敗")
 				return ctrl.Result{}, err
 			}
+			// Service 剛建立，NodePort 尚未指派，重新入列等待
 			return ctrl.Result{Requeue: true}, nil
 		}
-		log.Log.Error(err, "Failed to get SSH Service")
-		return ctrl.Result{}, err
+		logger.Error(getErr, "查詢 SSH Service 失敗")
+		return ctrl.Result{}, getErr
 	}
 
-	// Service already exists, check if it needs update
-	needsUpdate := false
-	if len(service.Spec.Ports) > 0 {
-		if service.Spec.Ports[0].Port != 2222 {
-			service.Spec.Ports[0].Port = 2222
-			service.Spec.Ports[0].TargetPort = intstr.FromInt(int(sshPort))
-			needsUpdate = true
-		}
-	}
-
-	if needsUpdate {
-		log.Log.Info("Updating existing SSH Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
-		if err := r.Update(ctx, service); err != nil {
-			log.Log.Error(err, "Failed to update existing SSH Service", "Service.Namespace", service.Namespace, "Service.Name", service.Name)
+	// Service 已存在，將 NodePort 回寫至 Notebook Annotation
+	if len(service.Spec.Ports) > 0 && service.Spec.Ports[0].NodePort > 0 {
+		nodePort := service.Spec.Ports[0].NodePort
+		if err := r.setSSHNodePortAnnotation(ctx, notebook, nodePort); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -115,8 +100,10 @@ func (r *NotebookReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
-// newSSHServiceForNotebook creates a new Service for a Notebook resource.
-func (r *NotebookReconciler) newSSHServiceForNotebook(notebook *notebookv1.Notebook, sshPort int32) *corev1.Service {
+// newSSHServiceForNotebook 建立一個以 NodePort 類型暴露 SSH 的 Service。
+// 固定使用 SSHServicePort（2222）作為 Service Port，
+// SSHContainerPort（22）作為容器目標 Port。
+func (r *NotebookReconciler) newSSHServiceForNotebook(notebook *notebookv1.Notebook) *corev1.Service {
 	labels := map[string]string{
 		"app":           notebook.Name,
 		"notebook-name": notebook.Name,
@@ -134,20 +121,62 @@ func (r *NotebookReconciler) newSSHServiceForNotebook(notebook *notebookv1.Noteb
 				{
 					Name:       "tcp-ssh",
 					Protocol:   corev1.ProtocolTCP,
-					Port:       sshPort,
-					TargetPort: intstr.FromInt(int(sshPort)),
+					Port:       SSHServicePort,
+					TargetPort: intstr.FromInt(int(SSHContainerPort)),
 				},
 			},
 			Type: corev1.ServiceTypeNodePort,
 		},
 	}
-	// Set the Notebook instance as the owner and controller
+
+	// 設定 Notebook 為 Service 的擁有者，確保 Notebook 刪除時 Service 自動回收
 	ctrl.SetControllerReference(notebook, service, r.Scheme)
 	return service
 }
 
-// SetupWithManager sets up the controller with the Manager.
-// Please look at OperatorPattern.md for the defails.
+// setSSHNodePortAnnotation 將 NodePort 值回寫至 Notebook 的 Annotation，
+// 僅在數值有變更時才呼叫 Update，避免不必要的 API 請求。
+func (r *NotebookReconciler) setSSHNodePortAnnotation(ctx context.Context, notebook *notebookv1.Notebook, nodePort int32) error {
+	annotations := notebook.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	newVal := fmt.Sprintf("%d", nodePort)
+	if annotations[SSHNodePortAnnotation] == newVal {
+		// 值未改變，無需更新
+		return nil
+	}
+
+	annotations[SSHNodePortAnnotation] = newVal
+	notebook.SetAnnotations(annotations)
+
+	logger := log.Log.WithValues("Notebook", notebook.Name, "NodePort", newVal)
+	logger.Info("回寫 SSH NodePort Annotation 至 Notebook")
+	return r.Update(ctx, notebook)
+}
+
+// clearSSHNodePortAnnotation 從 Notebook 的 Annotation 中移除 SSH NodePort 記錄。
+func (r *NotebookReconciler) clearSSHNodePortAnnotation(ctx context.Context, notebook *notebookv1.Notebook) error {
+	annotations := notebook.GetAnnotations()
+	if annotations == nil {
+		return nil
+	}
+	if _, exists := annotations[SSHNodePortAnnotation]; !exists {
+		// Annotation 本就不存在，無需操作
+		return nil
+	}
+
+	delete(annotations, SSHNodePortAnnotation)
+	notebook.SetAnnotations(annotations)
+
+	log.Log.WithValues("Notebook", notebook.Name).Info("清除 SSH NodePort Annotation")
+	return r.Update(ctx, notebook)
+}
+
+// SetupWithManager 將 NotebookReconciler 註冊至 Controller Manager。
+// 監聽 Notebook 資源的異動，以及由 Notebook 擁有的 Service 的異動。
+// 詳見 OperatorPattern.md。
 func (r *NotebookReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&notebookv1.Notebook{}).

@@ -14,12 +14,12 @@ docker-push:
 # Deploy to the cluster
 .PHONY: deploy
 deploy:
-	kubectl apply -k config/manager
+	kubectl apply -k config/default
 
 # Undeploy from the cluster
 .PHONY: undeploy
 undeploy:
-	kubectl delete -k config/manager
+	kubectl delete -k config/default
 
 # Run tests
 .PHONY: test

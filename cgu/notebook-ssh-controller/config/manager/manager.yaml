@@ -24,8 +24,17 @@ spec:
         - --metrics-bind-address=127.0.0.1:8080
         - --health-probe-bind-address=:8081
         - --leader-elect
-        image: cguaicadmin/notebook-ssh-controller:1.1.0
+        image: cguaicadmin/notebook-ssh-controller:pattentest
+        imagePullPolicy: Always
         name: manager
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -52,3 +61,8 @@ spec:
             memory: 64Mi
       serviceAccountName: default # 使用 'default' ServiceAccount
       terminationGracePeriodSeconds: 10
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: webhook-server-cert

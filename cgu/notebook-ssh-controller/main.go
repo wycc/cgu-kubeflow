@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strings"
 
 	// Import all Kubernetes client-go auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -14,6 +15,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	notebookv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1beta1" // 引入 Kubeflow Notebook API
 	"github.com/kubeflow/notebook-ssh-controller/controllers"
@@ -36,11 +38,13 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var adminUsers string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&adminUsers, "admin-users", "kubernetes-admin", "Comma-separated list of usernames allowed to modify the target annotation.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -78,6 +82,23 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
 		os.Exit(1)
 	}
+
+	// Register the validating webhook
+	adminUsersList := make([]string, 0)
+	for _, admin := range strings.Split(adminUsers, ",") {
+		trimmed := strings.TrimSpace(admin)
+		if trimmed != "" {
+			adminUsersList = append(adminUsersList, trimmed)
+		}
+	}
+
+	mgr.GetWebhookServer().Register("/validate-kubeflow-org-v1beta1-notebook", &webhook.Admission{
+		Handler: &controllers.NotebookValidator{
+			Client:     mgr.GetClient(),
+			AdminUsers: adminUsersList,
+		},
+	})
+	
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

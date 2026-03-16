@@ -5,9 +5,12 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	notebookv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1beta1"
 )
 
 // StatefulSetReconciler reconciles a StatefulSet object
@@ -19,75 +22,85 @@ type StatefulSetReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get;update;patch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
+// Reconcile 監聽 StatefulSet 的變化，針對隸屬於 Kubeflow Notebook 的 StatefulSet，
+// 依父 Notebook 是否帶有 SSHServiceLabel 來新增或移除 Istio 流量排除 Annotation。
 func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
-	// Fetch the StatefulSet instance
+	// 取得 StatefulSet 實例
 	statefulSet := &appsv1.StatefulSet{}
 	if err := r.Get(ctx, req.NamespacedName, statefulSet); err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			return ctrl.Result{}, client.IgnoreNotFound(err)
+			return ctrl.Result{}, err
 		}
-		// StatefulSet not found, could be deleted
+		// StatefulSet 已不存在，忽略
 		return ctrl.Result{}, nil
 	}
 
-	// Check if the StatefulSet is being deleted
+	// 若 StatefulSet 正在刪除中，無需處理
 	if !statefulSet.ObjectMeta.DeletionTimestamp.IsZero() {
-		// StatefulSet is being deleted, nothing to do
 		return ctrl.Result{}, nil
 	}
 
-	// Check if this StatefulSet is created by notebook
+	// 確認此 StatefulSet 是否由 Notebook 建立
 	if !r.isNotebookStatefulSet(statefulSet) {
-		// Not a notebook StatefulSet, skip
 		return ctrl.Result{}, nil
 	}
 
-	// Check if the StatefulSet has a second port defined
-	if !r.hasSecondPort(statefulSet) {
-		// No second port defined, skip
-		return ctrl.Result{}, nil
-	}
-
-	// Check if the Istio annotation is already present
-	if r.hasIstioAnnotation(statefulSet) {
-		// Annotation already exists, nothing to do
-		return ctrl.Result{}, nil
-	}
-
-	// Add the Istio annotation
-	if err := r.addIstioAnnotation(ctx, statefulSet); err != nil {
-		logger.Error(err, "Failed to add Istio annotation to StatefulSet", "StatefulSet", statefulSet.Name)
+	// 查詢父 Notebook 是否啟用了 SSH Service
+	sshEnabled, err := r.isSSHEnabledOnParentNotebook(ctx, statefulSet)
+	if err != nil {
+		logger.Error(err, "查詢父 Notebook SSH label 失敗", "StatefulSet", statefulSet.Name)
 		return ctrl.Result{}, err
 	}
 
-	logger.Info("Successfully added Istio annotation to StatefulSet", "StatefulSet", statefulSet.Name)
+	if !sshEnabled {
+		// SSH 未啟用：若 Istio 排除 Annotation 存在則移除
+		if r.hasIstioAnnotation(statefulSet) {
+			if err := r.removeIstioAnnotation(ctx, statefulSet); err != nil {
+				logger.Error(err, "移除 Istio 排除 Annotation 失敗", "StatefulSet", statefulSet.Name)
+				return ctrl.Result{}, err
+			}
+			logger.Info("已從 StatefulSet 移除 Istio 排除 Annotation", "StatefulSet", statefulSet.Name)
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// SSH 已啟用：確保 Istio 排除 Annotation 存在
+	if r.hasIstioAnnotation(statefulSet) {
+		// Annotation 已存在，無需操作
+		return ctrl.Result{}, nil
+	}
+
+	if err := r.addIstioAnnotation(ctx, statefulSet); err != nil {
+		logger.Error(err, "新增 Istio 排除 Annotation 失敗", "StatefulSet", statefulSet.Name)
+		return ctrl.Result{}, err
+	}
+
+	logger.Info("已為 StatefulSet 新增 Istio 排除 Annotation", "StatefulSet", statefulSet.Name)
 	return ctrl.Result{}, nil
 }
 
-// isNotebookStatefulSet checks if the StatefulSet is created by a notebook
+// isNotebookStatefulSet 判斷此 StatefulSet 是否由 Kubeflow Notebook 建立。
+// 符合以下任一條件即視為 Notebook 的 StatefulSet：
+//   - Labels 含有 "notebook-name"
+//   - Labels 含有 app.kubernetes.io/component=notebook
+//   - Labels 含有 kubeflow-resource-type=notebook
+//   - OwnerReferences 中有 Kind=Notebook 且 APIVersion=kubeflow.org/v1beta1
 func (r *StatefulSetReconciler) isNotebookStatefulSet(statefulSet *appsv1.StatefulSet) bool {
-	// Check for notebook-related labels or owner references
 	labels := statefulSet.GetLabels()
-	if labels == nil {
-		return false
+	if labels != nil {
+		if _, exists := labels["notebook-name"]; exists {
+			return true
+		}
+		if labels["app.kubernetes.io/component"] == "notebook" {
+			return true
+		}
+		if labels["kubeflow-resource-type"] == "notebook" {
+			return true
+		}
 	}
 
-	// Check for common notebook labels
-	if _, exists := labels["notebook-name"]; exists {
-		return true
-	}
-	if _, exists := labels["app.kubernetes.io/component"]; exists && labels["app.kubernetes.io/component"] == "notebook" {
-		return true
-	}
-	if _, exists := labels["kubeflow-resource-type"]; exists && labels["kubeflow-resource-type"] == "notebook" {
-		return true
-	}
-
-	// Check owner references for notebook controller
 	for _, ownerRef := range statefulSet.GetOwnerReferences() {
 		if ownerRef.Kind == "Notebook" && ownerRef.APIVersion == "kubeflow.org/v1beta1" {
 			return true
@@ -97,51 +110,68 @@ func (r *StatefulSetReconciler) isNotebookStatefulSet(statefulSet *appsv1.Statef
 	return false
 }
 
-// hasSecondPort checks if the StatefulSet has a second port defined in its containers
-func (r *StatefulSetReconciler) hasSecondPort(statefulSet *appsv1.StatefulSet) bool {
-	if statefulSet.Spec.Template.Spec.Containers == nil || len(statefulSet.Spec.Template.Spec.Containers) == 0 {
-		return false
+// isSSHEnabledOnParentNotebook 透過 OwnerReference 找到父 Notebook，
+// 並檢查其是否帶有 SSHServiceLabel="true"。
+// 若找不到父 Notebook 或 Notebook 不存在，回傳 false。
+func (r *StatefulSetReconciler) isSSHEnabledOnParentNotebook(ctx context.Context, statefulSet *appsv1.StatefulSet) (bool, error) {
+	for _, ownerRef := range statefulSet.GetOwnerReferences() {
+		if ownerRef.Kind != "Notebook" || ownerRef.APIVersion != "kubeflow.org/v1beta1" {
+			continue
+		}
+
+		notebook := &notebookv1.Notebook{}
+		if err := r.Get(ctx, types.NamespacedName{
+			Name:      ownerRef.Name,
+			Namespace: statefulSet.Namespace,
+		}, notebook); err != nil {
+			if client.IgnoreNotFound(err) == nil {
+				// Notebook 已不存在，視為未啟用
+				return false, nil
+			}
+			return false, err
+		}
+
+		return notebook.Labels[SSHServiceLabel] == "true", nil
 	}
 
-	// Check the first container for ports
-	container := statefulSet.Spec.Template.Spec.Containers[0]
-	if container.Ports == nil || len(container.Ports) < 2 {
-		return false
-	}
-
-	return true
+	// 找不到 Notebook OwnerReference，視為未啟用
+	return false, nil
 }
 
-// hasIstioAnnotation checks if the StatefulSet already has the Istio annotation
+// hasIstioAnnotation 檢查 StatefulSet 的 Pod Template 是否已有 Istio 排除 Annotation。
 func (r *StatefulSetReconciler) hasIstioAnnotation(statefulSet *appsv1.StatefulSet) bool {
 	annotations := statefulSet.Spec.Template.GetAnnotations()
 	if annotations == nil {
 		return false
 	}
-
-	_, exists := annotations["traffic.sidecar.istio.io/excludeInboundPorts"]
+	_, exists := annotations[IstioExcludePortAnnotation]
 	return exists
 }
 
-// addIstioAnnotation adds the Istio annotation to the StatefulSet
+// addIstioAnnotation 在 StatefulSet 的 Pod Template Annotations 中加入 Istio 排除規則，
+// 讓 Istio Sidecar 略過對 SSH 入站流量（Port 22）的攔截。
 func (r *StatefulSetReconciler) addIstioAnnotation(ctx context.Context, statefulSet *appsv1.StatefulSet) error {
-	// Get current annotations or create new map
 	annotations := statefulSet.Spec.Template.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-
-	// Add the Istio annotation
-	annotations["traffic.sidecar.istio.io/excludeInboundPorts"] = "22"
-
-	// Update the StatefulSet template annotations
+	annotations[IstioExcludePortAnnotation] = IstioExcludePortValue
 	statefulSet.Spec.Template.SetAnnotations(annotations)
-
-	// Update the StatefulSet
 	return r.Update(ctx, statefulSet)
 }
 
-// SetupWithManager sets up the controller with the Manager.
+// removeIstioAnnotation 從 StatefulSet 的 Pod Template Annotations 中移除 Istio 排除規則。
+func (r *StatefulSetReconciler) removeIstioAnnotation(ctx context.Context, statefulSet *appsv1.StatefulSet) error {
+	annotations := statefulSet.Spec.Template.GetAnnotations()
+	if annotations == nil {
+		return nil
+	}
+	delete(annotations, IstioExcludePortAnnotation)
+	statefulSet.Spec.Template.SetAnnotations(annotations)
+	return r.Update(ctx, statefulSet)
+}
+
+// SetupWithManager 將 StatefulSetReconciler 註冊至 Controller Manager。
 func (r *StatefulSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.StatefulSet{}).
