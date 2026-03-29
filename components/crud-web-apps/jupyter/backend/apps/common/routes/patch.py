@@ -5,7 +5,7 @@ from werkzeug import exceptions
 
 from kubeflow.kubeflow.crud_backend import api, decorators, logging
 
-from .. import status
+from .. import form, status, utils
 from . import bp
 
 log = logging.getLogger(__name__)
@@ -15,7 +15,23 @@ ISTEMPLATE_ATTE = "istemplate"
 CUSTOMERIMAGENAME_ATTR = "customerImageName"
 CUSTOMERIMAGEVERSION_ATTR = "customerImageVersion"
 CUSTOMERCOURSENAME_ATTR = "customerCourseName"
-ATTRIBUTES = set([STOP_ATTR, ISTEMPLATE_ATTE, CUSTOMERIMAGENAME_ATTR, CUSTOMERIMAGEVERSION_ATTR, CUSTOMERCOURSENAME_ATTR])
+CPU_ATTR = "cpu"
+CPU_LIMIT_ATTR = "cpuLimit"
+MEMORY_ATTR = "memory"
+MEMORY_LIMIT_ATTR = "memoryLimit"
+GPUS_ATTR = "gpus"
+ATTRIBUTES = set([
+    STOP_ATTR,
+    ISTEMPLATE_ATTE,
+    CUSTOMERIMAGENAME_ATTR,
+    CUSTOMERIMAGEVERSION_ATTR,
+    CUSTOMERCOURSENAME_ATTR,
+    CPU_ATTR,
+    CPU_LIMIT_ATTR,
+    MEMORY_ATTR,
+    MEMORY_LIMIT_ATTR,
+    GPUS_ATTR,
+])
 
 # Routes
 @bp.route(
@@ -52,7 +68,74 @@ def patch_notebook(namespace, notebook):
     if CUSTOMERCOURSENAME_ATTR in request_body:
         set_course_image_name_notebook(namespace, notebook, request_body)
 
+    if any(
+        attr in request_body
+        for attr in [
+            CPU_ATTR,
+            CPU_LIMIT_ATTR,
+            MEMORY_ATTR,
+            MEMORY_LIMIT_ATTR,
+            GPUS_ATTR,
+        ]
+    ):
+        set_notebook_resources(namespace, notebook, request_body)
+
     return api.success_response()
+
+
+def set_notebook_resources(namespace, notebook, request_body):
+    notebook_obj = api.get_notebook(notebook, namespace)
+    defaults = utils.load_spawner_ui_config()
+    metadata = notebook_obj.get("metadata", {})
+    labels = dict(metadata.get("labels", {}))
+    labels.setdefault("groupshare", "enabled")
+
+    container = notebook_obj["spec"]["template"]["spec"]["containers"][0]
+    container.setdefault("resources", {})
+    container["resources"].setdefault("requests", {})
+
+    if CPU_ATTR in request_body or CPU_LIMIT_ATTR in request_body:
+        form.set_notebook_cpu(notebook_obj, request_body, defaults)
+        if request_body.get(CPU_LIMIT_ATTR) == "":
+            container["resources"].setdefault("limits", {}).pop("cpu", None)
+
+    if MEMORY_ATTR in request_body or MEMORY_LIMIT_ATTR in request_body:
+        form.set_notebook_memory(notebook_obj, request_body, defaults)
+        if request_body.get(MEMORY_LIMIT_ATTR) == "":
+            container["resources"].setdefault("limits", {}).pop("memory", None)
+
+    if GPUS_ATTR in request_body:
+        gpu_vendors = defaults.get("gpus", {}).get("value", {}).get("vendors", [])
+        limits = container["resources"].setdefault("limits", {})
+        for vendor in gpu_vendors:
+            limits.pop(vendor.get("limitsKey"), None)
+
+        if request_body.get(GPUS_ATTR, {}).get("num") != "none":
+            form.set_notebook_gpus(notebook_obj, request_body, defaults)
+
+    if container["resources"].get("limits") == {}:
+        container["resources"].pop("limits")
+
+    patch_body = {
+        "metadata": {
+            "labels": labels,
+        },
+        "spec": {
+            "template": {
+                "spec": {
+                    "containers": [container]
+                }
+            }
+        }
+    }
+
+    log.info(
+        "Sending resource PATCH to Notebook %s/%s: %s",
+        namespace,
+        notebook,
+        patch_body,
+    )
+    api.patch_notebook(notebook, namespace, patch_body)
 
 # helper functions
 def set_customer_image_name_notebook(namespace, notebook, request_body):

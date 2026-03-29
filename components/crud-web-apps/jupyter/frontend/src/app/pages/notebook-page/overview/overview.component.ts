@@ -1,9 +1,23 @@
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+} from '@angular/core';
+import {
+  AbstractControl,
+  FormBuilder,
+  FormGroup,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { V1EnvVar, V1Pod, V1Volume } from '@kubernetes/client-node';
 import { ChipDescriptor, PollerService, STATUS_TYPE, UrlItem } from 'kubeflow';
 import { Subscription } from 'rxjs';
 import { JWABackendService } from 'src/app/services/backend.service';
-import { NotebookRawObject, PodDefault } from 'src/app/types';
+import { GPUVendor, NotebookRawObject, PodDefault } from 'src/app/types';
 import { EnvironmentVariablesGroup } from '../../../types/environmentVariablesGroup';
 import { Configuration } from 'src/app/types/configuration';
 import { isEqual, get } from 'lodash-es';
@@ -25,6 +39,16 @@ import {
 export class OverviewComponent implements OnInit, OnDestroy {
   public volGroups: VolumesGroup[] = [];
   public notebookInfoLoaded = false;
+  public editingField: string | null = null;
+  public isSavingResources = false;
+  public resourceError = '';
+
+  get isEditingResources(): boolean {
+    return this.editingField !== null;
+  }
+  public resourceForm: FormGroup;
+  public gpuVendors: GPUVendor[] = [];
+  public readonly gpuCounts = ['none', '1', '2', '4', '8'];
   private notebookEnv: ChipDescriptor[];
   public configurations: Configuration[] = [];
   private podDefaults: PodDefault[];
@@ -37,6 +61,7 @@ export class OverviewComponent implements OnInit, OnDestroy {
   private sshNodePortSub = new Subscription();
 
   @Input() notebookStatus: STATUS_TYPE;
+  @Output() resourceUpdated = new EventEmitter<void>();
 
   @Input()
   set notebook(nb: NotebookRawObject) {
@@ -47,6 +72,7 @@ export class OverviewComponent implements OnInit, OnDestroy {
     this.generatePodDefaults(nb);
     this.notebookEnv = this.generateEnv(nb);
     this.fetchSshNodePort(nb);
+    this.syncResourceForm(nb);
   }
   get notebook(): NotebookRawObject {
     return this.prvNotebook;
@@ -241,16 +267,53 @@ export class OverviewComponent implements OnInit, OnDestroy {
     return this.getSshNodePort();
   }
 
+  get gpuMessage(): string {
+    const gpu = this.getGpuSelection(this.notebook);
+    if (gpu.num === 'none') {
+      return null;
+    }
+
+    return `${gpu.num} ${this.getGpuVendorName(gpu.vendor)}`;
+  }
+
   getSshNodePort(): number | null {
     return this.prvSshNodePort;
   }
 
   constructor(
+    private fb: FormBuilder,
     public backend: JWABackendService,
     public poller: PollerService,
-  ) { }
+  ) {
+    this.resourceForm = this.fb.group(
+      {
+        cpu: [null, [Validators.required, Validators.min(0.1)]],
+        cpuLimit: [null, [Validators.min(0.1)]],
+        memory: [null, [Validators.required, Validators.min(0.1)]],
+        memoryLimit: [null, [Validators.min(0.1)]],
+        gpuNum: ['none'],
+        gpuVendor: [''],
+      },
+      { validators: this.resourceLimitValidator },
+    );
+  }
 
-  ngOnInit(): void { }
+  ngOnInit(): void {
+    this.backend.getConfig().subscribe(config => {
+      const vendors = (((config as any)?.gpus?.value?.vendors) || []) as GPUVendor[];
+      this.gpuVendors = vendors;
+      this.syncResourceForm(this.notebook);
+    });
+
+    this.gpuNumControl.valueChanges.subscribe((num: string) => {
+      if (num === 'none') {
+        this.gpuVendorControl.setValue('');
+        this.gpuVendorControl.disable();
+      } else {
+        this.gpuVendorControl.enable();
+      }
+    });
+  }
 
   ngOnDestroy(): void {
     if (this.pollSub) {
@@ -259,6 +322,244 @@ export class OverviewComponent implements OnInit, OnDestroy {
     if (this.sshNodePortSub) {
       this.sshNodePortSub.unsubscribe();
     }
+  }
+
+  startResourceEdit(field: string) {
+    this.resourceError = '';
+    this.editingField = field;
+    this.syncResourceForm(this.notebook);
+  }
+
+  cancelResourceEdit() {
+    this.editingField = null;
+    this.resourceError = '';
+    this.syncResourceForm(this.notebook);
+  }
+
+  saveResources() {
+    if (!this.notebook?.metadata?.namespace || !this.notebook?.metadata?.name) {
+      return;
+    }
+
+    if (this.resourceForm.invalid) {
+      this.resourceForm.markAllAsTouched();
+      return;
+    }
+
+    const formValue = this.resourceForm.getRawValue();
+    this.isSavingResources = true;
+    this.resourceError = '';
+
+    this.backend
+      .updateNotebookResources(
+        this.notebook.metadata.namespace,
+        this.notebook.metadata.name,
+        {
+          cpu: String(formValue.cpu),
+          cpuLimit: this.toPatchString(formValue.cpuLimit),
+          memory: `${formValue.memory}Gi`,
+          memoryLimit: this.toMemoryPatchString(formValue.memoryLimit),
+          gpus: {
+            num: formValue.gpuNum,
+            vendor: formValue.gpuVendor,
+          },
+        },
+      )
+      .subscribe(
+        () => {
+          this.applyResourceValuesToNotebook(formValue);
+          this.isSavingResources = false;
+          this.editingField = null;
+          this.resourceUpdated.emit();
+        },
+        error => {
+          this.isSavingResources = false;
+          this.resourceError = error;
+        },
+      );
+  }
+
+  get resourceFormHasLimitError() {
+    return (
+      this.resourceForm.hasError('cpuLimitTooSmall') ||
+      this.resourceForm.hasError('memoryLimitTooSmall')
+    );
+  }
+
+  get cpuControl() {
+    return this.resourceForm.get('cpu');
+  }
+
+  get cpuLimitControl() {
+    return this.resourceForm.get('cpuLimit');
+  }
+
+  get memoryControl() {
+    return this.resourceForm.get('memory');
+  }
+
+  get memoryLimitControl() {
+    return this.resourceForm.get('memoryLimit');
+  }
+
+  get gpuNumControl() {
+    return this.resourceForm.get('gpuNum');
+  }
+
+  get gpuVendorControl() {
+    return this.resourceForm.get('gpuVendor');
+  }
+
+  private resourceLimitValidator = (
+    control: AbstractControl,
+  ): ValidationErrors | null => {
+    const cpu = Number(control.get('cpu')?.value);
+    const cpuLimit = Number(control.get('cpuLimit')?.value);
+    const memory = Number(control.get('memory')?.value);
+    const memoryLimit = Number(control.get('memoryLimit')?.value);
+
+    const errors: ValidationErrors = {};
+
+    if (!isNaN(cpu) && !isNaN(cpuLimit) && cpuLimit < cpu) {
+      errors.cpuLimitTooSmall = true;
+    }
+
+    if (!isNaN(memory) && !isNaN(memoryLimit) && memoryLimit < memory) {
+      errors.memoryLimitTooSmall = true;
+    }
+
+    if (control.get('gpuNum')?.value !== 'none' && !control.get('gpuVendor')?.value) {
+      errors.gpuVendorRequired = true;
+    }
+
+    return Object.keys(errors).length ? errors : null;
+  };
+
+  private syncResourceForm(notebook: NotebookRawObject) {
+    const gpu = this.getGpuSelection(notebook);
+    this.resourceForm.reset({
+      cpu: this.parseResourceValue(this.getCpuRequest(notebook)),
+      cpuLimit: this.parseResourceValue(this.getCpuLimits(notebook)),
+      memory: this.parseResourceValue(this.getMemoryRequests(notebook)),
+      memoryLimit: this.parseResourceValue(this.getMemoryLimits(notebook)),
+      gpuNum: gpu.num,
+      gpuVendor: gpu.vendor,
+    });
+
+    if (gpu.num === 'none') {
+      this.gpuVendorControl.disable();
+    } else {
+      this.gpuVendorControl.enable();
+    }
+  }
+
+  private parseResourceValue(value: string): number | null {
+    if (!value) {
+      return null;
+    }
+
+    const normalized = String(value).replace('Gi', '');
+    const parsed = Number(normalized);
+
+    return isNaN(parsed) ? null : parsed;
+  }
+
+  private toPatchString(value: number | string): string {
+    if (value == null || value === '') {
+      return '';
+    }
+
+    return String(value);
+  }
+
+  private toMemoryPatchString(value: number | string): string {
+    const normalized = this.toPatchString(value);
+    if (normalized === '') {
+      return '';
+    }
+
+    return `${normalized}Gi`;
+  }
+
+  private applyResourceValuesToNotebook(formValue: {
+    cpu: number | string;
+    cpuLimit?: number | string;
+    memory: number | string;
+    memoryLimit?: number | string;
+    gpuNum?: string;
+    gpuVendor?: string;
+  }) {
+    const container = this.notebook?.spec?.template?.spec?.containers?.find(
+      cn => cn.name === this.notebook.metadata.name,
+    );
+
+    if (!container) {
+      return;
+    }
+
+    container.resources = container.resources || {};
+    container.resources.requests = container.resources.requests || {};
+    container.resources.limits = container.resources.limits || {};
+
+    container.resources.requests.cpu = String(formValue.cpu);
+    container.resources.requests.memory = `${formValue.memory}Gi`;
+
+    if (formValue.cpuLimit == null || formValue.cpuLimit === '') {
+      delete container.resources.limits.cpu;
+    } else {
+      container.resources.limits.cpu = String(formValue.cpuLimit);
+    }
+
+    if (formValue.memoryLimit == null || formValue.memoryLimit === '') {
+      delete container.resources.limits.memory;
+    } else {
+      container.resources.limits.memory = `${formValue.memoryLimit}Gi`;
+    }
+
+    for (const vendor of this.gpuVendors) {
+      delete container.resources.limits[vendor.limitsKey];
+    }
+
+    if (
+      formValue.gpuNum != null &&
+      formValue.gpuNum !== 'none' &&
+      formValue.gpuVendor
+    ) {
+      container.resources.limits[formValue.gpuVendor] = String(formValue.gpuNum);
+    }
+  }
+
+  private getGpuSelection(notebook: NotebookRawObject): {
+    num: string;
+    vendor: string;
+  } {
+    const container = notebook?.spec?.template?.spec?.containers?.find(
+      cn => cn.name === notebook?.metadata?.name,
+    );
+    const limits = container?.resources?.limits || {};
+    const knownGpuKeys = this.gpuVendors.map(v => v.limitsKey);
+
+    for (const key of Object.keys(limits)) {
+      if (key === 'cpu' || key === 'memory') {
+        continue;
+      }
+
+      if (knownGpuKeys.length === 0 || knownGpuKeys.includes(key)) {
+        return {
+          num: String(limits[key]),
+          vendor: key,
+        };
+      }
+    }
+
+    return {
+      num: 'none',
+      vendor: '',
+    };
+  }
+
+  private getGpuVendorName(vendorKey: string): string {
+    return this.gpuVendors.find(v => v.limitsKey === vendorKey)?.uiName || vendorKey;
   }
 
   private fetchSshNodePort(nb: NotebookRawObject) {

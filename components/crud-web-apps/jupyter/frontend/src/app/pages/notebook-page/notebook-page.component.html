@@ -37,6 +37,7 @@
               [pod]="notebookPod"
               [podRequestCompleted]="podRequestCompleted"
               [notebookStatus]="status"
+              (resourceUpdated)="refreshNotebook()"
             ></app-overview>
           </ng-template>
         </mat-tab>

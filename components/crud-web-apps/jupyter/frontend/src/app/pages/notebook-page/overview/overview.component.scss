@@ -6,7 +6,107 @@
   margin-top: 35px;
 }
 
-.resource-inline-edit-button {
-  min-width: auto;
-  padding: 0;
+.resource-value-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.resource-row-edit-btn {
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+  color: rgba(0, 0, 0, 0.38);
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+
+  mat-icon {
+    font-size: 16px;
+    height: 16px;
+    width: 16px;
+    line-height: 16px;
+  }
+}
+
+:host ::ng-deep lib-details-list-item:hover .resource-row-edit-btn {
+  opacity: 1;
+}
+
+.resource-row-edit-btn:hover {
+  color: rgba(0, 0, 0, 0.87);
+  opacity: 1;
+}
+
+.resource-action-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+
+    mat-icon {
+      font-size: 16px;
+      height: 16px;
+      width: 16px;
+    }
+  }
+}
+
+.resource-inline-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+
+    mat-icon {
+      font-size: 16px;
+      height: 16px;
+      width: 16px;
+    }
+  }
+}
+
+.resource-field-error {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #b3261e;
+}
+
+.resource-input {
+  width: 120px;
+  margin-bottom: -1.25em;
+}
+
+.resource-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resource-gpu-row {
+  display: flex;
+  gap: 12px;
+}
+
+.resource-gpu-vendor {
+  width: 180px;
+  margin-bottom: -1.25em;
+}
+
+.resource-unit {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.resource-error {
+  color: #b3261e;
 }

@@ -78,6 +78,14 @@ export class NotebookPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  refreshNotebook() {
+    if (!this.namespace || !this.notebookName) {
+      return;
+    }
+
+    this.poll(this.namespace, this.notebookName);
+  }
+
   private processIncomingData(notebook: NotebookRawObject) {
     const notebookCopy = JSON.parse(
       JSON.stringify(notebook),

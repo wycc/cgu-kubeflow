@@ -200,6 +200,28 @@ export class JWABackendService extends BackendService {
     );
   }
 
+  public updateNotebookResources(
+    namespace: string,
+    name: string,
+    resources: {
+      cpu: string;
+      cpuLimit: string;
+      memory: string;
+      memoryLimit: string;
+      gpus?: {
+        vendor?: string;
+        num: string;
+      };
+    },
+  ): Observable<string> {
+    const url = `api/namespaces/${namespace}/notebooks/${name}`;
+
+    return this.http.patch<JWABackendResponse>(url, resources).pipe(
+      catchError(error => this.handleError(error)),
+      map(_ => 'updated'),
+    );
+  }
+
 
 
   // DELETE
