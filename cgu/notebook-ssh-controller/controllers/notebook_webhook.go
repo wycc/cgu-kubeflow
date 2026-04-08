@@ -3,19 +3,24 @@ package controllers
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	notebookv1 "github.com/kubeflow/kubeflow/components/notebook-controller/api/v1beta1"
+
+	"slices"
 )
 
 // +kubebuilder:webhook:path=/validate-kubeflow-org-v1beta1-notebook,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubeflow.org,resources=notebooks,verbs=create;update,versions=v1beta1;v1,name=vnotebook.kb.io,admissionReviewVersions=v1
 
-const (
-	TargetAnnotationKey = "kflow.cgu.com.tw/external-access"
-)
+var TargetAnnotationKeys = []string{
+	"kflow.cgu.com.tw/external-access",
+	"kflow.cgu.com.tw/proxy-allow-ports",
+	"kflow.cgu.com.tw/proxy-ports",
+}
 
 // NotebookValidator validates Notebook based on annotations
 type NotebookValidator struct {
@@ -24,31 +29,29 @@ type NotebookValidator struct {
 	AdminUsers []string
 }
 
-// targetAnnotationChanged checks if the TargetAnnotationKey has been added or modified.
-func targetAnnotationChanged(oldObj, newObj *notebookv1.Notebook) bool {
-	var oldVal, newVal string
-	var oldExists, newExists bool
+// targetAnnotationChanged checks if any of the target annotations have been added or modified.
+func targetAnnotationChanged(oldObj, newObj *notebookv1.Notebook) (bool, []string) {
+	var changedKeys []string
 
-	if oldObj != nil && oldObj.Annotations != nil {
-		oldVal, oldExists = oldObj.Annotations[TargetAnnotationKey]
+	for _, key := range TargetAnnotationKeys {
+
+		var oldVal, newVal string
+		var oldExists, newExists bool
+
+		if oldObj != nil && oldObj.Annotations != nil {
+			oldVal, oldExists = oldObj.Annotations[key]
+		}
+
+		if newObj != nil && newObj.Annotations != nil {
+			newVal, newExists = newObj.Annotations[key]
+		}
+
+		if oldExists != newExists || oldVal != newVal {
+			changedKeys = append(changedKeys, key)
+		}
 	}
 
-	if newObj != nil && newObj.Annotations != nil {
-		newVal, newExists = newObj.Annotations[TargetAnnotationKey]
-	}
-
-	// 1. Both don't have the annotation: no change
-	if !oldExists && !newExists {
-		return false
-	}
-
-	// 2. One has it, the other doesn't: changed
-	if oldExists != newExists {
-		return true
-	}
-
-	// 3. Both have it: changed if values are different
-	return oldVal != newVal
+	return len(changedKeys) > 0, changedKeys
 }
 
 // isAdmin checks if the user is in the configured AdminUsers list.
@@ -89,15 +92,24 @@ func (v *NotebookValidator) Handle(ctx context.Context, req admission.Request) a
 		return admission.Allowed("") // Only handle CREATE/UPDATE
 	}
 
-	// Check if the target annotation has been added or modified
-	if targetAnnotationChanged(oldNotebook, notebook) {
-		logger.Info("Target annotation has changed", "annotation", TargetAnnotationKey)
+	// Check if the target annotations have been added or modified
+	changed, changedKeys := targetAnnotationChanged(oldNotebook, notebook)
+	if changed {
+		logger.Info("Target annotation has changed", "annotations", changedKeys)
 		// If changed, check if the user is an admin
-		if !v.isAdmin(req.UserInfo.Username) {
+		if slices.Contains(changedKeys, "kflow.cgu.com.tw/proxy-ports") {
+			var newPorts, _ = notebook.Annotations["kflow.cgu.com.tw/proxy-ports"]
+			for _, port := range strings.Split(newPorts, ",") {
+				var allowPorts, _ = notebook.Annotations["kflow.cgu.com.tw/proxy-allow-ports"]
+				if !slices.Contains(strings.Split(allowPorts, ","), port) {
+					return admission.Denied("Annotations should belongs to proxy-allow-ports.")
+				}
+			}
+		} else if !v.isAdmin(req.UserInfo.Username) {
 			logger.Info("Access denied: user is not in admin list", "adminUsersConfigured", v.AdminUsers)
-			return admission.Denied("Permission Denied: Only admins can add or modify " + TargetAnnotationKey)
+			return admission.Denied("Permission Denied: Only admins can add or modify annotations: " + strings.Join(changedKeys, ", "))
 		}
-		logger.Info("Access granted: user is an admin")
+		logger.Info("Access granted")
 	}
 
 	return admission.Allowed("")
