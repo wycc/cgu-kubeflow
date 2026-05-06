@@ -5,6 +5,16 @@
     [backButton]="true"
     (back)="navigateBack()"
   >
+    <div class="ssh-toggle-toolbar">
+      <span class="ssh-toggle-label">SSH</span>
+      <mat-slide-toggle
+        color="primary"
+        [checked]="sshToggleChecked"
+        [disabled]="isSshToggleDisabled"
+        (change)="onSshToggleChange($event.checked)"
+      >
+      </mat-slide-toggle>
+    </div>
   </lib-title-actions-toolbar>
 
   <div class="details-page-outer">

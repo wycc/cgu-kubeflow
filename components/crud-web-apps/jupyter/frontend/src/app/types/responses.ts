@@ -20,4 +20,5 @@ export interface JWABackendResponse extends BackendResponse {
   authorizationpolicy?: AuthorizationPolicyResponseObject[];
   manager?: string[];
   ssh_nodeport?: number;
+  node_ip?: string;
 }

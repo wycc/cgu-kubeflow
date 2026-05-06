@@ -5,6 +5,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { NotebookPageComponent } from './notebook-page.component';
 import { OverviewModule } from './overview/overview.module';
 import { YamlModule } from './yaml/yaml.module';
@@ -19,6 +20,7 @@ import { EventsModule } from './events/events.module';
     KubeflowModule,
     MatIconModule,
     MatDividerModule,
+    MatSlideToggleModule,
     MatTabsModule,
     OverviewModule,
     YamlModule,

@@ -15,6 +15,7 @@ import { KubeflowModule, NamespaceService, STATUS_TYPE } from 'kubeflow';
 import { ActivatedRoute } from '@angular/router';
 import { By } from '@angular/platform-browser';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { OverviewModule } from './overview/overview.module';
 import { LogsModule } from './logs/logs.module';
 import { YamlModule } from './yaml/yaml.module';
@@ -27,6 +28,7 @@ const JWABackendServiceStub: Partial<JWABackendService> = {
   getNotebook: () => of(mockNotebook),
   getNotebookPod: () => of(),
   getNotebookEvents: () => of(),
+  setNotebookSsh: () => of('enabled'),
 };
 const ActionsServiceStub: Partial<ActionsService> = {
   connectToNotebook: () => {},
@@ -63,6 +65,7 @@ describe('NotebookPageComponent', () => {
         RouterTestingModule,
         KubeflowModule,
         MatTabsModule,
+        MatSlideToggleModule,
         OverviewModule,
         LogsModule,
         EventsModule,
@@ -188,5 +191,18 @@ describe('NotebookPageComponent', () => {
     expect(flag).toBeFalse();
     flag = component.buttonsConfig.map(button => button.text).includes('START');
     expect(flag).toBeTrue();
+  });
+
+  it('should default the ssh toggle to off when ssh is disabled', () => {
+    fixture.detectChanges();
+    expect(component.sshToggleChecked).toBeFalse();
+  });
+
+  it('should default the ssh toggle to on when ssh is enabled', () => {
+    fixture.detectChanges();
+    component.notebook.metadata.labels['cgu.kubeflow.org/sshservice'] = 'true';
+    const isSshEnabled = 'isSshEnabled';
+    component.sshToggleChecked = component[isSshEnabled]();
+    expect(component.sshToggleChecked).toBeTrue();
   });
 });

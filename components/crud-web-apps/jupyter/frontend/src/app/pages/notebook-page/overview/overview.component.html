@@ -25,15 +25,24 @@
 </lib-details-list-item>
 
 <lib-details-list-item
-  *ngIf="cpuRequests || cpuLimits || memoryRequests || memoryLimits"
+  *ngIf="hasResourceValues"
   key="Resources"
 ></lib-details-list-item>
 
-<lib-details-list-item *ngIf="cpuRequests || editingField === 'minCpu'" key="Minimum CPU">
+<lib-details-list-item
+  *ngIf="hasDisplayValue(cpuRequests) || editingField === 'minCpu'"
+  key="Minimum CPU"
+>
   <ng-container *ngIf="editingField !== 'minCpu'; else minCpuEdit">
     <div class="resource-value-row">
       {{ cpuRequests }}
-      <button mat-icon-button class="resource-row-edit-btn" (click)="startResourceEdit('minCpu')" matTooltip="Edit">
+      <span class="resource-unit">cores</span>
+      <button
+        mat-icon-button
+        class="resource-row-edit-btn"
+        (click)="startResourceEdit('minCpu')"
+        matTooltip="Edit"
+      >
         <mat-icon>edit</mat-icon>
       </button>
     </div>
@@ -41,27 +50,70 @@
   <ng-template #minCpuEdit>
     <div class="resource-inline-edit-row">
       <mat-form-field appearance="outline" class="resource-input">
-        <input matInput type="number" min="0.1" step="0.1" [formControl]="cpuControl" />
+        <input
+          matInput
+          type="number"
+          min="0.1"
+          step="0.1"
+          [formControl]="cpuControl"
+        />
       </mat-form-field>
-      <button mat-flat-button color="primary" type="button" [disabled]="isSavingResources" (click)="saveResources()">
+      <span class="resource-unit">cores</span>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="isSavingResources"
+        (click)="saveResources()"
+      >
         <mat-icon>save</mat-icon> Save
       </button>
-      <button mat-stroked-button type="button" [disabled]="isSavingResources" (click)="cancelResourceEdit()">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="isSavingResources"
+        (click)="cancelResourceEdit()"
+      >
         <mat-icon>close</mat-icon> Cancel
       </button>
     </div>
-    <div class="resource-field-error" *ngIf="resourceForm.hasError('cpuLimitTooSmall') || resourceError">
-      <span *ngIf="resourceForm.hasError('cpuLimitTooSmall')">CPU limit must be ≥ request.</span>
+    <div
+      class="resource-field-error"
+      *ngIf="
+        showControlError(cpuControl, 'required') ||
+        showControlError(cpuControl, 'min') ||
+        showFormError('cpuLimitTooSmall') ||
+        resourceError
+      "
+    >
+      <span *ngIf="showControlError(cpuControl, 'required')"
+        >Minimum CPU is required.</span
+      >
+      <span *ngIf="showControlError(cpuControl, 'min')"
+        >Minimum CPU must be at least 0.1.</span
+      >
+      <span *ngIf="showFormError('cpuLimitTooSmall')"
+        >CPU limit must be ≥ request.</span
+      >
       <span *ngIf="resourceError">{{ resourceError }}</span>
     </div>
   </ng-template>
 </lib-details-list-item>
 
-<lib-details-list-item *ngIf="cpuLimits || editingField === 'maxCpu'" key="Maximum CPU">
+<lib-details-list-item
+  *ngIf="hasDisplayValue(cpuLimits) || editingField === 'maxCpu'"
+  key="Maximum CPU"
+>
   <ng-container *ngIf="editingField !== 'maxCpu'; else maxCpuEdit">
     <div class="resource-value-row">
       {{ cpuLimits }}
-      <button mat-icon-button class="resource-row-edit-btn" (click)="startResourceEdit('maxCpu')" matTooltip="Edit">
+      <span class="resource-unit">cores</span>
+      <button
+        mat-icon-button
+        class="resource-row-edit-btn"
+        (click)="startResourceEdit('maxCpu')"
+        matTooltip="Edit"
+      >
         <mat-icon>edit</mat-icon>
       </button>
     </div>
@@ -69,27 +121,65 @@
   <ng-template #maxCpuEdit>
     <div class="resource-inline-edit-row">
       <mat-form-field appearance="outline" class="resource-input">
-        <input matInput type="number" min="0.1" step="0.1" [formControl]="cpuLimitControl" />
+        <input
+          matInput
+          type="number"
+          min="0.1"
+          step="0.1"
+          [formControl]="cpuLimitControl"
+        />
       </mat-form-field>
-      <button mat-flat-button color="primary" type="button" [disabled]="isSavingResources" (click)="saveResources()">
+      <span class="resource-unit">cores</span>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="isSavingResources"
+        (click)="saveResources()"
+      >
         <mat-icon>save</mat-icon> Save
       </button>
-      <button mat-stroked-button type="button" [disabled]="isSavingResources" (click)="cancelResourceEdit()">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="isSavingResources"
+        (click)="cancelResourceEdit()"
+      >
         <mat-icon>close</mat-icon> Cancel
       </button>
     </div>
-    <div class="resource-field-error" *ngIf="resourceForm.hasError('cpuLimitTooSmall') || resourceError">
-      <span *ngIf="resourceForm.hasError('cpuLimitTooSmall')">CPU limit must be ≥ request.</span>
+    <div
+      class="resource-field-error"
+      *ngIf="
+        showControlError(cpuLimitControl, 'min') ||
+        showFormError('cpuLimitTooSmall') ||
+        resourceError
+      "
+    >
+      <span *ngIf="showControlError(cpuLimitControl, 'min')"
+        >Maximum CPU must be blank or at least 0.1.</span
+      >
+      <span *ngIf="showFormError('cpuLimitTooSmall')"
+        >CPU limit must be ≥ request.</span
+      >
       <span *ngIf="resourceError">{{ resourceError }}</span>
     </div>
   </ng-template>
 </lib-details-list-item>
 
-<lib-details-list-item *ngIf="memoryRequests || editingField === 'minMemory'" key="Minimum memory">
+<lib-details-list-item
+  *ngIf="hasDisplayValue(memoryRequests) || editingField === 'minMemory'"
+  key="Minimum memory"
+>
   <ng-container *ngIf="editingField !== 'minMemory'; else minMemoryEdit">
     <div class="resource-value-row">
       {{ memoryRequests }}
-      <button mat-icon-button class="resource-row-edit-btn" (click)="startResourceEdit('minMemory')" matTooltip="Edit">
+      <button
+        mat-icon-button
+        class="resource-row-edit-btn"
+        (click)="startResourceEdit('minMemory')"
+        matTooltip="Edit"
+      >
         <mat-icon>edit</mat-icon>
       </button>
     </div>
@@ -97,28 +187,69 @@
   <ng-template #minMemoryEdit>
     <div class="resource-inline-edit-row">
       <mat-form-field appearance="outline" class="resource-input">
-        <input matInput type="number" min="0.1" step="0.1" [formControl]="memoryControl" />
+        <input
+          matInput
+          type="number"
+          min="0.1"
+          step="0.1"
+          [formControl]="memoryControl"
+        />
       </mat-form-field>
       <span class="resource-unit">Gi</span>
-      <button mat-flat-button color="primary" type="button" [disabled]="isSavingResources" (click)="saveResources()">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="isSavingResources"
+        (click)="saveResources()"
+      >
         <mat-icon>save</mat-icon> Save
       </button>
-      <button mat-stroked-button type="button" [disabled]="isSavingResources" (click)="cancelResourceEdit()">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="isSavingResources"
+        (click)="cancelResourceEdit()"
+      >
         <mat-icon>close</mat-icon> Cancel
       </button>
     </div>
-    <div class="resource-field-error" *ngIf="resourceForm.hasError('memoryLimitTooSmall') || resourceError">
-      <span *ngIf="resourceForm.hasError('memoryLimitTooSmall')">Memory limit must be ≥ request.</span>
+    <div
+      class="resource-field-error"
+      *ngIf="
+        showControlError(memoryControl, 'required') ||
+        showControlError(memoryControl, 'min') ||
+        showFormError('memoryLimitTooSmall') ||
+        resourceError
+      "
+    >
+      <span *ngIf="showControlError(memoryControl, 'required')"
+        >Minimum memory is required.</span
+      >
+      <span *ngIf="showControlError(memoryControl, 'min')"
+        >Minimum memory must be at least 0.1 Gi.</span
+      >
+      <span *ngIf="showFormError('memoryLimitTooSmall')"
+        >Memory limit must be ≥ request.</span
+      >
       <span *ngIf="resourceError">{{ resourceError }}</span>
     </div>
   </ng-template>
 </lib-details-list-item>
 
-<lib-details-list-item *ngIf="memoryLimits || editingField === 'maxMemory'" key="Maximum memory">
+<lib-details-list-item
+  *ngIf="hasDisplayValue(memoryLimits) || editingField === 'maxMemory'"
+  key="Maximum memory"
+>
   <ng-container *ngIf="editingField !== 'maxMemory'; else maxMemoryEdit">
     <div class="resource-value-row">
       {{ memoryLimits }}
-      <button mat-icon-button class="resource-row-edit-btn" (click)="startResourceEdit('maxMemory')" matTooltip="Edit">
+      <button
+        mat-icon-button
+        class="resource-row-edit-btn"
+        (click)="startResourceEdit('maxMemory')"
+        matTooltip="Edit"
+      >
         <mat-icon>edit</mat-icon>
       </button>
     </div>
@@ -126,28 +257,65 @@
   <ng-template #maxMemoryEdit>
     <div class="resource-inline-edit-row">
       <mat-form-field appearance="outline" class="resource-input">
-        <input matInput type="number" min="0.1" step="0.1" [formControl]="memoryLimitControl" />
+        <input
+          matInput
+          type="number"
+          min="0.1"
+          step="0.1"
+          [formControl]="memoryLimitControl"
+        />
       </mat-form-field>
       <span class="resource-unit">Gi</span>
-      <button mat-flat-button color="primary" type="button" [disabled]="isSavingResources" (click)="saveResources()">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="isSavingResources"
+        (click)="saveResources()"
+      >
         <mat-icon>save</mat-icon> Save
       </button>
-      <button mat-stroked-button type="button" [disabled]="isSavingResources" (click)="cancelResourceEdit()">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="isSavingResources"
+        (click)="cancelResourceEdit()"
+      >
         <mat-icon>close</mat-icon> Cancel
       </button>
     </div>
-    <div class="resource-field-error" *ngIf="resourceForm.hasError('memoryLimitTooSmall') || resourceError">
-      <span *ngIf="resourceForm.hasError('memoryLimitTooSmall')">Memory limit must be ≥ request.</span>
+    <div
+      class="resource-field-error"
+      *ngIf="
+        showControlError(memoryLimitControl, 'min') ||
+        showFormError('memoryLimitTooSmall') ||
+        resourceError
+      "
+    >
+      <span *ngIf="showControlError(memoryLimitControl, 'min')"
+        >Maximum memory must be blank or at least 0.1 Gi.</span
+      >
+      <span *ngIf="showFormError('memoryLimitTooSmall')"
+        >Memory limit must be ≥ request.</span
+      >
       <span *ngIf="resourceError">{{ resourceError }}</span>
     </div>
   </ng-template>
 </lib-details-list-item>
 
-<lib-details-list-item *ngIf="gpuMessage || editingField === 'gpu'" key="GPUs">
+<lib-details-list-item
+  *ngIf="hasDisplayValue(gpuMessage) || editingField === 'gpu'"
+  key="GPUs"
+>
   <ng-container *ngIf="editingField !== 'gpu'; else gpuEdit">
     <div class="resource-value-row">
       {{ gpuMessage }}
-      <button mat-icon-button class="resource-row-edit-btn" (click)="startResourceEdit('gpu')" matTooltip="Edit">
+      <button
+        mat-icon-button
+        class="resource-row-edit-btn"
+        (click)="startResourceEdit('gpu')"
+        matTooltip="Edit"
+      >
         <mat-icon>edit</mat-icon>
       </button>
     </div>
@@ -163,32 +331,58 @@
       </mat-form-field>
       <mat-form-field appearance="outline" class="resource-gpu-vendor">
         <mat-select [formControl]="gpuVendorControl">
-          <mat-option *ngFor="let vendor of gpuVendors" [value]="vendor.limitsKey">
+          <mat-option
+            *ngFor="let vendor of gpuVendors"
+            [value]="vendor.limitsKey"
+          >
             {{ vendor.uiName }}
           </mat-option>
         </mat-select>
       </mat-form-field>
-      <button mat-flat-button color="primary" type="button" [disabled]="isSavingResources" (click)="saveResources()">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="isSavingResources"
+        (click)="saveResources()"
+      >
         <mat-icon>save</mat-icon> Save
       </button>
-      <button mat-stroked-button type="button" [disabled]="isSavingResources" (click)="cancelResourceEdit()">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="isSavingResources"
+        (click)="cancelResourceEdit()"
+      >
         <mat-icon>close</mat-icon> Cancel
       </button>
     </div>
-    <div class="resource-field-error" *ngIf="resourceForm.hasError('gpuVendorRequired') || resourceError">
-      <span *ngIf="resourceForm.hasError('gpuVendorRequired')">You must specify the GPU vendor.</span>
+    <div
+      class="resource-field-error"
+      *ngIf="showFormError('gpuVendorRequired') || resourceError"
+    >
+      <span *ngIf="showFormError('gpuVendorRequired')"
+        >You must specify the GPU vendor.</span
+      >
       <span *ngIf="resourceError">{{ resourceError }}</span>
     </div>
   </ng-template>
 </lib-details-list-item>
 
-
 <lib-details-list-item key="Image" [copyValue]="dockerImage">
   {{ dockerImage }}
 </lib-details-list-item>
 
-<lib-details-list-item *ngIf="sshNodePort" key="SSH NodePort">
-  {{ sshNodePort }}
+<lib-details-list-item key="Node_IP">
+  {{ nodeIpText }}
+</lib-details-list-item>
+
+<lib-details-list-item key="Node_PORT">
+  {{ nodePortText }}
+</lib-details-list-item>
+
+<lib-details-list-item key="SSH Command" [copyValue]="sshCommand">
+  {{ sshCommand }}
 </lib-details-list-item>
 
 <lib-content-list-item key="Environment">

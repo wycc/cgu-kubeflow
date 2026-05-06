@@ -11,6 +11,7 @@ from . import bp
 log = logging.getLogger(__name__)
 
 STOP_ATTR = "stopped"
+SSH_ATTR = "ssh"
 ISTEMPLATE_ATTE = "istemplate"
 CUSTOMERIMAGENAME_ATTR = "customerImageName"
 CUSTOMERIMAGEVERSION_ATTR = "customerImageVersion"
@@ -20,8 +21,11 @@ CPU_LIMIT_ATTR = "cpuLimit"
 MEMORY_ATTR = "memory"
 MEMORY_LIMIT_ATTR = "memoryLimit"
 GPUS_ATTR = "gpus"
+SSH_SERVICE_LABEL = "cgu.kubeflow.org/sshservice"
+SSH_NODEPORT_ANNOTATION = "cgu.kubeflow.org/ssh-nodeport"
 ATTRIBUTES = set([
     STOP_ATTR,
+    SSH_ATTR,
     ISTEMPLATE_ATTE,
     CUSTOMERIMAGENAME_ATTR,
     CUSTOMERIMAGEVERSION_ATTR,
@@ -56,6 +60,9 @@ def patch_notebook(namespace, notebook):
     if STOP_ATTR in request_body:
         start_stop_notebook(namespace, notebook, request_body)
 
+    if SSH_ATTR in request_body:
+        set_notebook_ssh(namespace, notebook, request_body)
+
     if ISTEMPLATE_ATTE in request_body:
         enable_disable_template_notebook(namespace, notebook, request_body)
 
@@ -88,7 +95,6 @@ def set_notebook_resources(namespace, notebook, request_body):
     defaults = utils.load_spawner_ui_config()
     metadata = notebook_obj.get("metadata", {})
     labels = dict(metadata.get("labels", {}))
-    labels.setdefault("groupshare", "enabled")
 
     container = notebook_obj["spec"]["template"]["spec"]["containers"][0]
     container.setdefault("resources", {})
@@ -131,6 +137,38 @@ def set_notebook_resources(namespace, notebook, request_body):
 
     log.info(
         "Sending resource PATCH to Notebook %s/%s: %s",
+        namespace,
+        notebook,
+        patch_body,
+    )
+    api.patch_notebook(notebook, namespace, patch_body)
+
+
+def set_notebook_ssh(namespace, notebook, request_body):
+    ssh_enabled = request_body[SSH_ATTR]
+    if not isinstance(ssh_enabled, bool):
+        raise exceptions.BadRequest("ssh must be a boolean.")
+
+    patch_body = {
+        "metadata": {
+            "labels": {
+                SSH_SERVICE_LABEL: "true" if ssh_enabled else "false",
+            },
+        },
+    }
+    if not ssh_enabled:
+        patch_body["metadata"]["annotations"] = {
+            SSH_NODEPORT_ANNOTATION: None,
+        }
+
+    log.info(
+        "Setting SSH for Notebook %s/%s to %s",
+        namespace,
+        notebook,
+        ssh_enabled,
+    )
+    log.info(
+        "Sending SSH PATCH to Notebook %s/%s: %s",
         namespace,
         notebook,
         patch_body,

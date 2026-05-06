@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy , Input} from '@angular/core';
+import { Component, OnInit, OnDestroy, Input } from '@angular/core';
 import { environment } from '@app/environment';
 import {
   NamespaceService,
@@ -15,7 +15,7 @@ import {
 } from 'kubeflow';
 import { JWABackendService } from 'src/app/services/backend.service';
 import { Subscription } from 'rxjs';
-import { 
+import {
   defaultConfig,
   defaultAdvancedConfig, // Lance
 } from './config';
@@ -33,6 +33,9 @@ import { MatDialog } from '@angular/material/dialog';
 import { AbstractControl } from '@angular/forms';
 import { DialogSharing } from './dialog-sharing/dialog-sharing.component';
 // YCL 2023/12/03 end
+
+const SSH_SERVICE_LABEL = 'cgu.kubeflow.org/sshservice';
+const SSH_NODEPORT_ANNOTATION = 'cgu.kubeflow.org/ssh-nodeport';
 
 @Component({
   selector: 'app-index-default',
@@ -91,19 +94,16 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     this.nsSub = this.ns.getSelectedNamespace2().subscribe(ns => {
       this.currNamespace = ns.toString();
       // alert("Lance 2-1 " + this.currNamespace);
-      this.backend.getManager( this.currNamespace).subscribe(manager => {
+      this.backend.getManager(this.currNamespace).subscribe(manager => {
         // alert("Lance 2 " + manager[0]);
-        if( manager[0] === "manager" )
-          this.isBasic = false;
-        else
-          this.isBasic = true;
+        if (manager[0] === 'manager') this.isBasic = false;
+        else this.isBasic = true;
       });
       this.poll(ns);
       this.newNotebookButton.namespaceChanged(ns, $localize`Notebook`);
     });
 
     this.backend.getUsername().subscribe(username => {
-
       if (Object.keys(username).length === 0) {
         // Don't fire on empty config
         //console.log("NO username")
@@ -118,12 +118,11 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         this.isBasic = true;
       */
 
-      //this.isBasic = false;  
+      //this.isBasic = false;
       // alert(username);
       //console.log("username", username)
     });
 
-    
     // Poll for new data and reset the poller if different data is found
     /*
     this.nsSub.add(
@@ -200,6 +199,9 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
       case 'connect':
         this.connectClicked(a.data);
         break;
+      case 'toggle-ssh':
+        this.toggleSshClicked(a.data);
+        break;
       case 'start-stop':
         this.startStopClicked(a.data);
         break;
@@ -226,91 +228,143 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         break;
       case 'share':
         // this.shareClicked(a.data);
-        const dialogRef =this.dialog.open(DialogSharing,{ data: { namespace: a.data.namespace, name: a.data.name }});  
-        dialogRef.afterClosed().subscribe((result) => {
-            //const jsyaml = require('js-yaml');
-            if (result && result.useremail) {
-              const useremail = result.useremail;
-              console.log('User Email from Dialog:', useremail);
-              const selected = result.selected;
-              // if select "view" //
-              if (selected =='option1'){
-                const paths = `/notebook/${a.data.namespace}/${a.data.name}/view/*`;
-                const namevalue = `notebook-${a.data.name}-authorizationpolicy-view`;
+        const dialogRef = this.dialog.open(DialogSharing, {
+          data: { namespace: a.data.namespace, name: a.data.name },
+        });
+        dialogRef.afterClosed().subscribe(result => {
+          //const jsyaml = require('js-yaml');
+          if (result && result.useremail) {
+            const useremail = result.useremail;
+            console.log('User Email from Dialog:', useremail);
+            const selected = result.selected;
+            // if select "view" //
+            if (selected == 'option1') {
+              const paths = `/notebook/${a.data.namespace}/${a.data.name}/view/*`;
+              const namevalue = `notebook-${a.data.name}-authorizationpolicy-view`;
 
-                this.backend.getAllAuthorizationPolicy(a.data.namespace).subscribe(aps => {
+              this.backend
+                .getAllAuthorizationPolicy(a.data.namespace)
+                .subscribe(aps => {
                   console.log(a.data.namespace);
-                  var deletename = "notebook-" + a.data.name +"-authorizationpolicy-view";
-                  var names = aps.map((ap) => { return ap.metadata.name });
-                  var filteredNames = names.filter((name) => name.includes(deletename));
-              
-                if (filteredNames.length <= 0) {
-                  this.backend.createAuthorization(this.currNamespace,namevalue,paths,useremail).subscribe(
-                    (response) => {
-                    console.log("Success");
-                    console.log('currNamespace:', this.currNamespace);
-                    console.log('namevalue:', namevalue);
-                    console.log("paths:", paths);
-                    console.log("useremail:", useremail);
-                    console.log("selected-option:", selected);
-                    },
-                (error) => {
-                  console.error('Error creating authorization policy:', error);
-                });
-                }else {
-                  //2024/01/23 新增email功能 start
-                  this.backend.modify_authorizaiton(this.currNamespace,namevalue,useremail).subscribe(
-                    (response) => {
-                    console.log("Success for adding");
-                    console.log('currNamespace:', this.currNamespace);
-                    console.log('namevalue:', namevalue);
-                    console.log("useremail:", useremail);
-                    console.log("selected-option:", selected);
-                    },
-                    (error) => {
-                      console.log('filteredName != 0, existed');
+                  var deletename =
+                    'notebook-' + a.data.name + '-authorizationpolicy-view';
+                  var names = aps.map(ap => {
+                    return ap.metadata.name;
                   });
-              
-                }
-              });
+                  var filteredNames = names.filter(name =>
+                    name.includes(deletename),
+                  );
+
+                  if (filteredNames.length <= 0) {
+                    this.backend
+                      .createAuthorization(
+                        this.currNamespace,
+                        namevalue,
+                        paths,
+                        useremail,
+                      )
+                      .subscribe(
+                        response => {
+                          console.log('Success');
+                          console.log('currNamespace:', this.currNamespace);
+                          console.log('namevalue:', namevalue);
+                          console.log('paths:', paths);
+                          console.log('useremail:', useremail);
+                          console.log('selected-option:', selected);
+                        },
+                        error => {
+                          console.error(
+                            'Error creating authorization policy:',
+                            error,
+                          );
+                        },
+                      );
+                  } else {
+                    //2024/01/23 新增email功能 start
+                    this.backend
+                      .modify_authorizaiton(
+                        this.currNamespace,
+                        namevalue,
+                        useremail,
+                      )
+                      .subscribe(
+                        response => {
+                          console.log('Success for adding');
+                          console.log('currNamespace:', this.currNamespace);
+                          console.log('namevalue:', namevalue);
+                          console.log('useremail:', useremail);
+                          console.log('selected-option:', selected);
+                        },
+                        error => {
+                          console.log('filteredName != 0, existed');
+                        },
+                      );
+                  }
+                });
               //2024/01/23 新增email功能 end
-            }else{
+            } else {
               // if select "editable" //
               const paths = `/notebook/${a.data.namespace}/${a.data.name}/*`;
               const namevalue = `notebook-${a.data.name}-authorizationpolicy-editable`;
-              this.backend.getAllAuthorizationPolicy(a.data.namespace).subscribe(aps => {
-                console.log(a.data.namespace);
-                var deletename = "notebook-" + a.data.name +"-authorizationpolicy-editable";
-                var names = aps.map((ap) => { return ap.metadata.name });
-                var filteredNames = names.filter((name) => name.includes(deletename));
-              if (filteredNames.length <= 0) {
-                this.backend.createAuthorization(this.currNamespace,namevalue,paths,useremail).subscribe(
-                (response) => {
-                  console.log("Success");
-                  console.log('currNamespace:', this.currNamespace);
-                  console.log('namevalue:', namevalue);
-                  console.log("paths:", paths);
-                  console.log("useremail:", useremail);
-                  console.log("selected-option:", selected);
-                },
-                (error) => {
-                  console.error('Error creating authorization policy:', error);
+              this.backend
+                .getAllAuthorizationPolicy(a.data.namespace)
+                .subscribe(aps => {
+                  console.log(a.data.namespace);
+                  var deletename =
+                    'notebook-' + a.data.name + '-authorizationpolicy-editable';
+                  var names = aps.map(ap => {
+                    return ap.metadata.name;
+                  });
+                  var filteredNames = names.filter(name =>
+                    name.includes(deletename),
+                  );
+                  if (filteredNames.length <= 0) {
+                    this.backend
+                      .createAuthorization(
+                        this.currNamespace,
+                        namevalue,
+                        paths,
+                        useremail,
+                      )
+                      .subscribe(
+                        response => {
+                          console.log('Success');
+                          console.log('currNamespace:', this.currNamespace);
+                          console.log('namevalue:', namevalue);
+                          console.log('paths:', paths);
+                          console.log('useremail:', useremail);
+                          console.log('selected-option:', selected);
+                        },
+                        error => {
+                          console.error(
+                            'Error creating authorization policy:',
+                            error,
+                          );
+                        },
+                      );
+                  } else {
+                    //2024/01/23 新增email功能 start
+                    this.backend
+                      .modify_authorizaiton(
+                        this.currNamespace,
+                        namevalue,
+                        useremail,
+                      )
+                      .subscribe(
+                        response => {
+                          console.log('Success for adding');
+                          console.log('currNamespace:', this.currNamespace);
+                          console.log('namevalue:', namevalue);
+                          console.log('useremail:', useremail);
+                          console.log('selected-option:', selected);
+                        },
+                        error => {
+                          console.log('filteredName != 0, existed');
+                        },
+                      );
+                  }
                 });
-              }else {
-                //2024/01/23 新增email功能 start
-                this.backend.modify_authorizaiton(this.currNamespace,namevalue,useremail).subscribe(
-                  (response) => {
-                  console.log("Success for adding");
-                  console.log('currNamespace:', this.currNamespace);
-                  console.log('namevalue:', namevalue);
-                  console.log("useremail:", useremail);
-                  console.log("selected-option:", selected);
-                  },
-                  (error) => {
-                    console.log('filteredName != 0, existed');
-                });
-              }
-            })};
+            }
             //2024/01/23 新增email功能 end
           }
         });
@@ -318,7 +372,7 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         break;
       case 'view':
         // this.viewClicked(a.data);
-        break;  
+        break;
     }
   }
 
@@ -338,6 +392,39 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
 
   public connectClicked(notebook: NotebookProcessedObject) {
     this.actions.connectToNotebook(notebook.namespace, notebook.name);
+  }
+
+  public toggleSshClicked(notebook: NotebookProcessedObject) {
+    const nextSshEnabled = !this.isSshEnabled(notebook);
+    this.setNotebookSshState(notebook, nextSshEnabled);
+    notebook.sshUpdating = true;
+    this.updateNotebookFields(notebook);
+
+    this.backend
+      .setNotebookSsh(notebook.namespace, notebook.name, nextSshEnabled)
+      .subscribe({
+        next: () => {
+          notebook.sshUpdating = false;
+          this.updateNotebookFields(notebook);
+
+          const config: SnackBarConfig = {
+            data: {
+              msg: nextSshEnabled
+                ? $localize`Enabling SSH for notebook '${notebook.name}'...`
+                : $localize`Disabling SSH for notebook '${notebook.name}'...`,
+              snackType: SnackType.Info,
+            },
+            duration: 4000,
+          };
+          this.snackBar.open(config);
+          this.poll(this.currNamespace);
+        },
+        error: () => {
+          this.setNotebookSshState(notebook, !nextSshEnabled);
+          notebook.sshUpdating = false;
+          this.updateNotebookFields(notebook);
+        },
+      });
   }
 
   public startStopClicked(notebook: NotebookProcessedObject) {
@@ -376,11 +463,13 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   updateNotebookFields(notebook: NotebookProcessedObject) {
     /* Lance - Begin 0906 */
     notebook.setTemplateAction = this.processSetTemplateActionStatus(notebook);
-    notebook.removeTemplateAction = this.processRemoveTemplateActionStatus(notebook);
+    notebook.removeTemplateAction =
+      this.processRemoveTemplateActionStatus(notebook);
     notebook.shareAction = STATUS_TYPE.READY;
     /* Lance - End 0906 */
     notebook.deleteAction = this.processDeletionActionStatus(notebook);
     notebook.connectAction = this.processConnectActionStatus(notebook);
+    notebook.sshAction = this.processSshActionStatus(notebook);
     notebook.startStopAction = this.processStartStopActionStatus(notebook);
     notebook.link = {
       text: notebook.name,
@@ -411,7 +500,6 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   }
 
   public enableTemplateNotebook(notebook: NotebookProcessedObject) {
-    
     const config: SnackBarConfig = {
       data: {
         msg: $localize`Set Notebook as template '${notebook.name}'...`,
@@ -490,18 +578,18 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
         /* Lance - end 20240906 */
 
         notebook.status.phase = STATUS_TYPE.TERMINATING;
-        notebook.status.message = 'Preparing to disable the Notebook as template...';
+        notebook.status.message =
+          'Preparing to disable the Notebook as template...';
         this.updateNotebookFields(notebook);
       });
     });
   }
 
   showAddPostDialog(notebook: NotebookProcessedObject) {
-
     this.currentName = notebook.name;
     this.dialog.open(AddPostDialogComponent, {
       hasBackdrop: false,
-      data: { notebook: notebook}
+      data: { notebook: notebook },
     });
 
     //this.dialog.open(AddPostDialogComponent, {
@@ -511,10 +599,9 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   }
 
   processSetTemplateActionStatus(notebook: NotebookProcessedObject) {
-
-    // if (notebook.jsonStr === null) 
+    // if (notebook.jsonStr === null)
     //  return STATUS_TYPE.TERMINATING;
-    
+
     // alert(notebook.name + ' ' + notebook.isTemplate);
 
     if (notebook.isTemplate !== 'yes') {
@@ -530,7 +617,6 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
   }
 
   processRemoveTemplateActionStatus(notebook: NotebookProcessedObject) {
-
     if (notebook.isTemplate === 'yes') {
       return STATUS_TYPE.READY;
     }
@@ -580,24 +666,62 @@ export class IndexDefaultComponent implements OnInit, OnDestroy {
     return STATUS_TYPE.READY;
   }
 
+  processSshActionStatus(notebook: NotebookProcessedObject) {
+    if (notebook.sshUpdating) {
+      return STATUS_TYPE.WAITING;
+    }
+
+    if (
+      notebook.status.phase === STATUS_TYPE.TERMINATING ||
+      notebook.status.phase === STATUS_TYPE.WAITING
+    ) {
+      return STATUS_TYPE.UNAVAILABLE;
+    }
+
+    if (this.isSshEnabled(notebook)) {
+      return STATUS_TYPE.READY;
+    }
+
+    return STATUS_TYPE.UNINITIALIZED;
+  }
+
+  isSshEnabled(notebook: NotebookProcessedObject): boolean {
+    return notebook.metadata?.labels?.[SSH_SERVICE_LABEL] === 'true';
+  }
+
+  setNotebookSshState(
+    notebook: NotebookProcessedObject,
+    sshEnabled: boolean,
+  ): void {
+    notebook.metadata = notebook.metadata || {};
+    notebook.metadata.labels = notebook.metadata.labels || {};
+    notebook.metadata.annotations = notebook.metadata.annotations || {};
+    notebook.metadata.labels[SSH_SERVICE_LABEL] = sshEnabled ? 'true' : 'false';
+
+    if (!sshEnabled) {
+      delete notebook.metadata.annotations[SSH_NODEPORT_ANNOTATION];
+    }
+  }
+
   public notebookTrackByFn(index: number, notebook: NotebookProcessedObject) {
     return `${notebook.name}/${notebook.image}`;
   }
 
   search(event: any) {
-    
     this.currentField = event;
     // alert(this.currentField)
-    this.processedData = this.processIncomingData(this.rawData.filter((notebook) => {
-      console.log(notebook.name);
-      return (
-        notebook.name.includes(this.currentField) ||
-        notebook.namespace.includes(this.currentField) ||
-        notebook.image.includes(this.currentField)
-      );
-    }));
-  
+    this.processedData = this.processIncomingData(
+      this.rawData.filter(notebook => {
+        console.log(notebook.name);
+        return (
+          notebook.name.includes(this.currentField) ||
+          notebook.namespace.includes(this.currentField) ||
+          notebook.image.includes(this.currentField)
+        );
+      }),
+    );
+
     // Lance, not sure what poller will do
     // this.poller.reset();
-  };
+  }
 }

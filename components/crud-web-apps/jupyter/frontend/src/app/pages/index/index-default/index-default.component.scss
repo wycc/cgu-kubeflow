@@ -1,0 +1,7 @@
+::ng-deep .mat-column-ssh.mat-header-cell {
+  text-align: center;
+}
+
+::ng-deep .mat-column-ssh.mat-header-cell .mat-sort-header-container {
+  transform: translateX(24px);
+}

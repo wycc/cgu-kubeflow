@@ -53,12 +53,14 @@ export class OverviewComponent implements OnInit, OnDestroy {
   public configurations: Configuration[] = [];
   private podDefaults: PodDefault[];
   public envGroups: EnvironmentVariablesGroup[] = [];
-  private prvSshNodePort: number | null = null;
+  private prvNodeIp: string | null = null;
+  private prvNodePort: number | null = null;
 
   private prvNotebook: NotebookRawObject;
   private prvPod: V1Pod;
   private pollSub = new Subscription();
-  private sshNodePortSub = new Subscription();
+  private nodeIpSub = new Subscription();
+  private nodePortSub = new Subscription();
 
   @Input() notebookStatus: STATUS_TYPE;
   @Output() resourceUpdated = new EventEmitter<void>();
@@ -71,7 +73,8 @@ export class OverviewComponent implements OnInit, OnDestroy {
     this.volGroups = this.generateVolGroups(nb);
     this.generatePodDefaults(nb);
     this.notebookEnv = this.generateEnv(nb);
-    this.fetchSshNodePort(nb);
+    this.fetchNodeIp(nb);
+    this.fetchNodePort(nb);
     this.syncResourceForm(nb);
   }
   get notebook(): NotebookRawObject {
@@ -149,6 +152,20 @@ export class OverviewComponent implements OnInit, OnDestroy {
     return this.getSharedMemory(this.notebook);
   }
 
+  public hasDisplayValue(value: unknown): boolean {
+    return value !== null && value !== undefined && value !== '';
+  }
+
+  get hasResourceValues(): boolean {
+    return [
+      this.cpuRequests,
+      this.cpuLimits,
+      this.memoryRequests,
+      this.memoryLimits,
+      this.gpuMessage,
+    ].some(value => this.hasDisplayValue(value));
+  }
+
   getSharedMemory(notebook: NotebookRawObject): string {
     if (!notebook?.spec?.template?.spec?.volumes) {
       return 'null';
@@ -176,7 +193,7 @@ export class OverviewComponent implements OnInit, OnDestroy {
       if (!cn.resources.limits) {
         return null;
       }
-      return cn.resources.limits?.cpu;
+      return this.formatCpuQuantity(cn.resources.limits?.cpu);
     }
   }
 
@@ -206,7 +223,7 @@ export class OverviewComponent implements OnInit, OnDestroy {
       if (!cn.resources.requests) {
         return null;
       }
-      return cn.resources.requests?.cpu;
+      return this.formatCpuQuantity(cn.resources.requests?.cpu);
     }
   }
 
@@ -225,7 +242,7 @@ export class OverviewComponent implements OnInit, OnDestroy {
       if (!cn.resources.requests) {
         return null;
       }
-      return cn.resources.requests?.memory;
+      return this.formatMemoryQuantity(cn.resources.requests?.memory);
     }
   }
 
@@ -241,10 +258,10 @@ export class OverviewComponent implements OnInit, OnDestroy {
       if (cn.name !== notebook.metadata.name) {
         continue;
       }
-      if (!cn.resources.requests) {
+      if (!cn.resources.limits) {
         return null;
       }
-      return cn.resources.limits?.memory;
+      return this.formatMemoryQuantity(cn.resources.limits?.memory);
     }
   }
 
@@ -263,21 +280,33 @@ export class OverviewComponent implements OnInit, OnDestroy {
     }
   }
 
-  get sshNodePort(): number | null {
-    return this.getSshNodePort();
+  get nodeIp(): string | null {
+    return this.prvNodeIp;
+  }
+
+  get nodeIpText(): string {
+    return this.nodeIp || '找不到';
   }
 
   get gpuMessage(): string {
     const gpu = this.getGpuSelection(this.notebook);
     if (gpu.num === 'none') {
-      return null;
+      return 'None';
     }
 
     return `${gpu.num} ${this.getGpuVendorName(gpu.vendor)}`;
   }
 
-  getSshNodePort(): number | null {
-    return this.prvSshNodePort;
+  get nodePort(): number | null {
+    return this.prvNodePort;
+  }
+
+  get nodePortText(): string {
+    return this.nodePort != null ? String(this.nodePort) : '找不到';
+  }
+
+  get sshCommand(): string {
+    return `ssh -p ${this.nodePortText} jovyan@${this.nodeIpText}`;
   }
 
   constructor(
@@ -300,7 +329,8 @@ export class OverviewComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.backend.getConfig().subscribe(config => {
-      const vendors = (((config as any)?.gpus?.value?.vendors) || []) as GPUVendor[];
+      const vendors = ((config as any)?.gpus?.value?.vendors ||
+        []) as GPUVendor[];
       this.gpuVendors = vendors;
       this.syncResourceForm(this.notebook);
     });
@@ -319,8 +349,11 @@ export class OverviewComponent implements OnInit, OnDestroy {
     if (this.pollSub) {
       this.pollSub.unsubscribe();
     }
-    if (this.sshNodePortSub) {
-      this.sshNodePortSub.unsubscribe();
+    if (this.nodeIpSub) {
+      this.nodeIpSub.unsubscribe();
+    }
+    if (this.nodePortSub) {
+      this.nodePortSub.unsubscribe();
     }
   }
 
@@ -410,6 +443,24 @@ export class OverviewComponent implements OnInit, OnDestroy {
     return this.resourceForm.get('gpuVendor');
   }
 
+  public showControlError(
+    control: AbstractControl | null,
+    errorCode?: string,
+  ): boolean {
+    if (!control || !(control.touched || control.dirty)) {
+      return false;
+    }
+
+    return errorCode ? control.hasError(errorCode) : control.invalid;
+  }
+
+  public showFormError(errorCode: string): boolean {
+    return (
+      this.resourceForm.hasError(errorCode) &&
+      (this.resourceForm.touched || this.resourceForm.dirty)
+    );
+  }
+
   private resourceLimitValidator = (
     control: AbstractControl,
   ): ValidationErrors | null => {
@@ -428,7 +479,10 @@ export class OverviewComponent implements OnInit, OnDestroy {
       errors.memoryLimitTooSmall = true;
     }
 
-    if (control.get('gpuNum')?.value !== 'none' && !control.get('gpuVendor')?.value) {
+    if (
+      control.get('gpuNum')?.value !== 'none' &&
+      !control.get('gpuVendor')?.value
+    ) {
       errors.gpuVendorRequired = true;
     }
 
@@ -438,10 +492,12 @@ export class OverviewComponent implements OnInit, OnDestroy {
   private syncResourceForm(notebook: NotebookRawObject) {
     const gpu = this.getGpuSelection(notebook);
     this.resourceForm.reset({
-      cpu: this.parseResourceValue(this.getCpuRequest(notebook)),
-      cpuLimit: this.parseResourceValue(this.getCpuLimits(notebook)),
-      memory: this.parseResourceValue(this.getMemoryRequests(notebook)),
-      memoryLimit: this.parseResourceValue(this.getMemoryLimits(notebook)),
+      cpu: this.parseCpuResourceValue(this.getCpuRequest(notebook)),
+      cpuLimit: this.parseCpuResourceValue(this.getCpuLimits(notebook)),
+      memory: this.parseMemoryResourceValue(this.getMemoryRequests(notebook)),
+      memoryLimit: this.parseMemoryResourceValue(
+        this.getMemoryLimits(notebook),
+      ),
       gpuNum: gpu.num,
       gpuVendor: gpu.vendor,
     });
@@ -453,15 +509,113 @@ export class OverviewComponent implements OnInit, OnDestroy {
     }
   }
 
-  private parseResourceValue(value: string): number | null {
-    if (!value) {
+  private parseCpuResourceValue(value: string | number): number | null {
+    if (value === null || value === undefined || value === '') {
       return null;
     }
 
-    const normalized = String(value).replace('Gi', '');
+    const normalized = String(value).trim();
+    if (normalized.endsWith('m')) {
+      const milliValue = Number(normalized.slice(0, -1));
+      return isNaN(milliValue) ? null : milliValue / 1000;
+    }
+
     const parsed = Number(normalized);
 
     return isNaN(parsed) ? null : parsed;
+  }
+
+  private formatCpuQuantity(value: string | number): string | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+
+    const parsed = this.parseCpuResourceValue(value);
+    if (parsed == null) {
+      return String(value);
+    }
+
+    return this.formatResourceNumber(parsed);
+  }
+
+  private parseMemoryResourceValue(value: string | number): number | null {
+    const bytes = this.parseMemoryQuantityToBytes(value);
+    if (bytes == null) {
+      return null;
+    }
+
+    return bytes / Math.pow(1024, 3);
+  }
+
+  private formatMemoryQuantity(value: string | number): string | null {
+    const bytes = this.parseMemoryQuantityToBytes(value);
+    if (bytes == null) {
+      if (value === null || value === undefined || value === '') {
+        return null;
+      }
+
+      return String(value);
+    }
+
+    const gib = Math.pow(1024, 3);
+    const mib = Math.pow(1024, 2);
+
+    if (bytes >= gib) {
+      return `${this.formatResourceNumber(bytes / gib)}Gi`;
+    }
+
+    if (bytes >= mib) {
+      return `${this.formatResourceNumber(bytes / mib)}Mi`;
+    }
+
+    return String(value);
+  }
+
+  private parseMemoryQuantityToBytes(value: string | number): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+
+    const normalized = String(value).trim();
+    const match = normalized.match(/^([0-9]+(?:\.[0-9]+)?)([a-zA-Z]+)?$/);
+    if (!match) {
+      return null;
+    }
+
+    const amount = Number(match[1]);
+    const suffix = match[2] || '';
+
+    if (isNaN(amount)) {
+      return null;
+    }
+
+    const multipliers = {
+      '': 1,
+      m: 1 / 1000,
+      K: 1000,
+      M: Math.pow(1000, 2),
+      G: Math.pow(1000, 3),
+      T: Math.pow(1000, 4),
+      P: Math.pow(1000, 5),
+      E: Math.pow(1000, 6),
+      Ki: 1024,
+      Mi: Math.pow(1024, 2),
+      Gi: Math.pow(1024, 3),
+      Ti: Math.pow(1024, 4),
+      Pi: Math.pow(1024, 5),
+      Ei: Math.pow(1024, 6),
+    } as const;
+
+    const multiplier = multipliers[suffix as keyof typeof multipliers];
+    if (multiplier == null) {
+      return null;
+    }
+
+    return amount * multiplier;
+  }
+
+  private formatResourceNumber(value: number): string {
+    return Number(value.toFixed(2)).toString();
   }
 
   private toPatchString(value: number | string): string {
@@ -525,7 +679,9 @@ export class OverviewComponent implements OnInit, OnDestroy {
       formValue.gpuNum !== 'none' &&
       formValue.gpuVendor
     ) {
-      container.resources.limits[formValue.gpuVendor] = String(formValue.gpuNum);
+      container.resources.limits[formValue.gpuVendor] = String(
+        formValue.gpuNum,
+      );
     }
   }
 
@@ -559,29 +715,54 @@ export class OverviewComponent implements OnInit, OnDestroy {
   }
 
   private getGpuVendorName(vendorKey: string): string {
-    return this.gpuVendors.find(v => v.limitsKey === vendorKey)?.uiName || vendorKey;
+    return (
+      this.gpuVendors.find(v => v.limitsKey === vendorKey)?.uiName || vendorKey
+    );
   }
 
-  private fetchSshNodePort(nb: NotebookRawObject) {
+  private fetchNodeIp(nb: NotebookRawObject) {
     if (!nb?.metadata?.namespace || !nb?.metadata?.name) {
+      this.prvNodeIp = null;
       return;
     }
 
-    this.sshNodePortSub.unsubscribe();
+    this.nodeIpSub.unsubscribe();
+
+    const request = this.backend.getNotebookNodeIp(
+      nb.metadata.namespace,
+      nb.metadata.name,
+    );
+
+    this.nodeIpSub = request.subscribe(
+      nodeIp => {
+        this.prvNodeIp = nodeIp;
+      },
+      error => {
+        this.prvNodeIp = null;
+      },
+    );
+  }
+
+  private fetchNodePort(nb: NotebookRawObject) {
+    if (!nb?.metadata?.namespace || !nb?.metadata?.name) {
+      this.prvNodePort = null;
+      return;
+    }
+
+    this.nodePortSub.unsubscribe();
 
     const request = this.backend.getNotebookSshNodePort(
       nb.metadata.namespace,
-      nb.metadata.name
+      nb.metadata.name,
     );
 
-    this.sshNodePortSub = request.subscribe(
+    this.nodePortSub = request.subscribe(
       nodePort => {
-        this.prvSshNodePort = nodePort;
+        this.prvNodePort = nodePort;
       },
       error => {
-        // Silently handle error - SSH NodePort may not be available
-        this.prvSshNodePort = null;
-      }
+        this.prvNodePort = null;
+      },
     );
   }
 
