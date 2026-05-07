@@ -1,0 +1,7 @@
+Release ietms for the 2026 H2 release
+* Support remote SSH access. We can enable the ssh port in the jupyter server UI.
+* Support public service to the external internet. This can be configured in the account manager.
+* Use the open code to manager the services in a chatbot via MCP and skills.
+* Make announcements in the account manager
+* Support shared folder to shared data within the entire cluster or group.
+* Improve cost report. We can access the cost inside the account manager without using the grafana.
