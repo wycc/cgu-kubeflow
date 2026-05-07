@@ -7,8 +7,34 @@ from .. import utils
 from .. import status
 from . import bp
 
+from flask import request
+import os
+import traceback
+import json
+
 log = logging.getLogger(__name__)
 
+SECURE_COOKIES = os.getenv("APP_SECURE_COOKIES", "true").lower() == "true"
+DISABLE_AUTH = os.getenv("APP_DISABLE_AUTH", "false").lower() == "true"
+USER_HEADER = os.getenv("USERID_HEADER", "kubeflow-userid")
+USER_PREFIX = os.getenv("USERID_PREFIX", ":")
+
+@bp.route("/api/manager/<namespace>")
+def get_manager(namespace):
+    print("get_manager: ", namespace)
+    if namespace is None:
+        return "user"
+    profile = api.get_profile(namespace)
+    manager = "user"
+    if profile is not None:
+        try:
+            manager = profile["metadata"]["annotations"]["manager"]
+        except:
+            manager = "user"
+
+    contents = [manager]
+
+    return api.success_response("manager", contents)
 
 @bp.route("/api/config")
 def get_config():
@@ -56,6 +82,59 @@ def get_notebooks(namespace):
 
     return api.success_response("notebooks", contents)
 
+@bp.route("/api/namespaces/<orig>/<namespace>/sharednotebooks/<notebook>")
+def get_sharednotebooks(orig, namespace,notebook):
+    log.info('XXXXXXXXXXXXXXXXXXXXXXXXX')
+    aps = api.get_notebooks_access(namespace,notebook,'')
+    profiles = api.get_profile(orig)
+    email = profiles['spec']['owner']['name']
+
+    authorization_name_view = f"notebook-{notebook}-authorizationpolicy-view"
+    authorization_name_editable = f"notebook-{notebook}-authorizationpolicy-editable"
+
+    target_ap = None
+    for ap in aps:
+        if not isinstance(ap, dict):
+            print("Received unexpected data format for an item in the list:", type(ap))
+            continue
+        if ap.get("metadata", {}).get("name") == authorization_name_view:
+            target_ap = ap
+            break
+        if ap.get("metadata", {}).get("name") == authorization_name_editable:
+            target_ap = ap
+            break
+
+    if target_ap is not None:
+        values = target_ap["spec"]["rules"][0]["when"][0]["values"]
+        log.info(values)
+        log.info(email)
+        if email in values:
+          print(values)
+          print("##############################")
+          nb = api.get_notebook_unsafe(notebook,namespace)
+          contents = [utils.notebook_dict_from_k8s_obj(nb)]
+          return api.success_response("notebooks", contents)
+        else:
+          return api.success_response("notebooks", [])
+    else:
+        log.info('no ap is defined')
+        return api.success_response("notebooks", [])
+
+
+@bp.route("/api/namespaces/<namespace>/allnotebooks")
+def get_all_notebooks(namespace):
+
+    log.info("Get %s allnotebooks", namespace)
+
+    notebooks = api.list_all_notebooks(namespace)["items"]
+    log.info("Get %s allnotebooks 1", namespace)
+    for nb in notebooks:
+        print(nb["metadata"]["namespace"],nb["metadata"]["name"])
+
+    contents = [utils.notebook_dict_from_k8s_obj(nb) for nb in notebooks]
+    log.info("Get allnotebooks done")
+
+    return api.success_response("notebooks", contents)
 
 @bp.route("/api/namespaces/<namespace>/notebooks/<name>")
 def get_notebook(name, namespace):
@@ -78,6 +157,54 @@ def get_notebook_pod(notebook_name, namespace):
         )
     else:
         raise NotFound("No pod detected.")
+
+
+@bp.route("/api/namespaces/<namespace>/notebooks/<notebook_name>/ssh-nodeport")
+def get_notebook_ssh_nodeport(notebook_name, namespace):
+    """Get the SSH NodePort for a notebook's service."""
+    try:
+        # Try to get service with notebook name as label selector
+        label_selector = "notebook-name=" + notebook_name
+        services = api.list_services(namespace=namespace, label_selector=label_selector)
+        
+        if not services.items:
+            # If no service found with label, try direct service name
+            # Common patterns: {notebook_name}, {notebook_name}-ssh
+            service_names = [notebook_name, f"{notebook_name}-ssh"]
+            service = None
+            for svc_name in service_names:
+                try:
+                    service = api.get_service(svc_name, namespace)
+                    if service:
+                        break
+                except:
+                    continue
+            
+            if not service:
+                raise NotFound(f"No service found for notebook {notebook_name}")
+        else:
+            service = services.items[0]
+        
+        # Find SSH port in service
+        ssh_nodeport = None
+        if service.spec and service.spec.ports:
+            for port in service.spec.ports:
+                # Check for SSH port (common names: ssh, SSH, or port 22)
+                if (port.name and port.name.lower() == "ssh") or port.port == 22:
+                    if port.node_port:
+                        ssh_nodeport = port.node_port
+                        break
+        
+        if ssh_nodeport is None:
+            raise NotFound(f"No SSH NodePort found in service for notebook {notebook_name}")
+        
+        return api.success_response("ssh_nodeport", ssh_nodeport)
+    
+    except NotFound as e:
+        raise e
+    except Exception as e:
+        log.error(f"Error getting SSH NodePort: {str(e)}")
+        raise NotFound(f"Error retrieving SSH NodePort: {str(e)}")
 
 
 @bp.route("/api/namespaces/<namespace>/notebooks/<notebook_name>/pod/<pod_name>/logs")  # noqa: E501
@@ -120,3 +247,61 @@ def get_gpu_vendors():
     available_vendors = installed_resources.intersection(config_vendor_keys)
 
     return api.success_response("vendors", list(available_vendors))
+
+
+#get authorizationpolicy start
+@bp.route("/api/namespaces/<namespace>/aps")
+def get_all_aps(namespace):
+    try:
+        aps = api.list_all_authorizationpolicy(namespace)["items"]
+        print(aps)
+        contents = [ap for ap in aps]
+        
+    except:
+        print("XXXXXXXXXXXXXXXXXXXX")
+        print(traceback.format_exc())
+        return api.success_response("authorizationpolicy", ["xxx"])  
+    return api.success_response("authorizationpolicy", contents)
+#get authorizationpolicy end
+
+#2024 YC notebook access start#
+@bp.route("/api/namespaces/<namespace>/aps-1/<notebook>/<url1>")
+def get_notebooks_access(namespace,notebook,url1):
+    aps = api.get_notebooks_access(namespace,notebook,url1)
+
+    if "view" in url1:
+        authorization_name = f"notebook-{notebook}-authorizationpolicy-view"
+    else:
+        authorization_name = f"notebook-{notebook}-authorizationpolicy-editable"
+    print(authorization_name)
+    print(url1)
+    print("##############################")
+
+    target_ap = None
+    for ap in aps:
+        if not isinstance(ap, dict):
+            print("Received unexpected data format for an item in the list:", type(ap))
+            continue
+        if ap.get("metadata", {}).get("name") == authorization_name:
+            target_ap = ap
+            break
+    if target_ap is not None:
+        values = target_ap["spec"]["rules"][0]["when"][0]["values"]
+        print(values)
+        print("##############################")
+        return values
+    else:
+       values = ["None"]
+       return values
+#2024 YC notebook access end#
+
+#2024 YC get profile start#
+@bp.route("/api/namespaces/<namespace>/aps-2")
+def get_profile1(namespace):
+    profiles = api.get_profile(namespace)
+    # Lance
+    # annotations_json = json.loads(profiles['metadata']['annotations']['kubectl.kubernetes.io/last-applied-configuration'])
+    email = profiles['spec']['owner']['name']
+    print(email)
+    return api.success_response("email", email)
+#2024 YC get profile end#

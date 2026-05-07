@@ -44,6 +44,10 @@
   {{ dockerImage }}
 </lib-details-list-item>
 
+<lib-details-list-item *ngIf="sshNodePort" key="SSH NodePort">
+  {{ sshNodePort }}
+</lib-details-list-item>
+
 <lib-content-list-item key="Environment">
   <lib-variables-group-table
     [envGroups]="envGroups"

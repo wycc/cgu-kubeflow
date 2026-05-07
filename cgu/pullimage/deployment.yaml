@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pullimage
+  namespace: pullimage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pullimage
+  template:
+    metadata:
+      labels:
+        app: pullimage
+    spec:
+      serviceAccountName: pullimage-sa
+      containers:
+        - name: pullimage
+          image: cguaicadmin/pullimage:V1.0.0
+          imagePullPolicy: Always

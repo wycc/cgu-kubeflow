@@ -47,5 +47,12 @@ rules:
   - networking.istio.io
   resources:
   - virtualservices
+  - envoyfilters
+  verbs:
+  - '*'
+- apiGroups:
+  - security.istio.io
+  resources:
+  - authorizationpolicies
   verbs:
   - '*'

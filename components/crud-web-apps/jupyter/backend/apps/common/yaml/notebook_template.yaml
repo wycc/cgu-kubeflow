@@ -5,9 +5,11 @@ metadata:
   namespace: "{namespace}"
   labels:
     app: {name}
+    isTemplateName: {isTemplate}
   annotations:
     notebooks.kubeflow.org/server-type: ""
     notebooks.kubeflow.org/creator: {creator}
+    jsonStr: {jsonStr}
 spec:
   template:
     spec:
@@ -21,5 +23,12 @@ spec:
             requests:
               cpu: "0.1"
               memory: "0.1Gi"
+          securityContext:
+            capabilities:
+              add:
+              - IPC_LOCK    
       volumes: []
       tolerations: []
+
+
+      
