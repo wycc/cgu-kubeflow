@@ -18,5 +18,7 @@ export interface JWABackendResponse extends BackendResponse {
   pod?: V1Pod;
   events?: EventObject[];
   authorizationpolicy?: AuthorizationPolicyResponseObject[];
-  manager?:string[];  
+  manager?: string[];
+  ssh_nodeport?: number;
+  node_ip?: string;
 }

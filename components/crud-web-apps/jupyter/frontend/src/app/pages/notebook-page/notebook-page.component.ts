@@ -14,6 +14,8 @@ import { V1Pod } from '@kubernetes/client-node';
 import { ActionsService } from 'src/app/services/actions.service';
 import { isEqual } from 'lodash-es';
 
+const SSH_SERVICE_LABEL = 'cgu.kubeflow.org/sshservice';
+
 @Component({
   selector: 'app-notebook-page',
   templateUrl: './notebook-page.component.html',
@@ -29,6 +31,8 @@ export class NotebookPageComponent implements OnInit, OnDestroy {
   public podRequestError = '';
   public selectedTab = { index: 0, name: 'overview' };
   public buttonsConfig: ToolbarButton[] = [];
+  public sshUpdating = false;
+  public sshToggleChecked = false;
 
   pollSubNotebook = new Subscription();
   pollSubPod = new Subscription();
@@ -72,10 +76,19 @@ export class NotebookPageComponent implements OnInit, OnDestroy {
 
     this.pollSubNotebook = this.poller.exponential(request).subscribe(nb => {
       this.notebook = this.processIncomingData(nb);
+      this.sshToggleChecked = this.isSshEnabled();
       this.getNotebookPod(nb);
       this.updateButtons();
       this.notebookInfoLoaded = true;
     });
+  }
+
+  refreshNotebook() {
+    if (!this.namespace || !this.notebookName) {
+      return;
+    }
+
+    this.poll(this.namespace, this.notebookName);
   }
 
   private processIncomingData(notebook: NotebookRawObject) {
@@ -132,6 +145,10 @@ export class NotebookPageComponent implements OnInit, OnDestroy {
 
   get status(): Status {
     return this.notebook.processed_status;
+  }
+
+  private isSshEnabled(): boolean {
+    return this.notebook?.metadata?.labels?.[SSH_SERVICE_LABEL] === 'true';
   }
 
   private updateButtons() {
@@ -199,6 +216,33 @@ export class NotebookPageComponent implements OnInit, OnDestroy {
 
   private connectToNotebook() {
     this.actions.connectToNotebook(this.namespace, this.notebookName);
+  }
+
+  get isSshToggleDisabled(): boolean {
+    return (
+      this.sshUpdating ||
+      this.status.phase === STATUS_TYPE.TERMINATING ||
+      this.status.phase === STATUS_TYPE.WAITING
+    );
+  }
+
+  public onSshToggleChange(checked: boolean) {
+    this.sshToggleChecked = checked;
+    this.sshUpdating = true;
+
+    this.backend
+      .setNotebookSsh(this.namespace, this.notebookName, checked)
+      .subscribe({
+        next: _ => {
+          this.sshUpdating = false;
+          this.poll(this.namespace, this.notebookName);
+        },
+        error: _ => {
+          this.sshToggleChecked = this.isSshEnabled();
+          this.sshUpdating = false;
+          this.updateButtons();
+        },
+      });
   }
 
   private startNotebook() {

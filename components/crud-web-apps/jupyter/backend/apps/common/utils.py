@@ -19,6 +19,15 @@ NOTEBOOK_TEMPLATE_YAML = os.path.join(
 )
 
 # Lance begin 20240907
+NOTEBOOK_TEMPLATE_CLONE_YAML = os.path.join(
+    FILE_ABS_PATH, "yaml/notebook_template_clone.yaml"
+)
+
+CLONES = [
+    "/etc/config/notebook_template_clone.yaml",
+    NOTEBOOK_TEMPLATE_CLONE_YAML,
+]
+
 def get_first_existing_file(file_list):
     for file in file_list:
         if isinstance(file, str) and os.path.exists(file):
@@ -29,30 +38,9 @@ def get_first_existing_file(file_list):
             print(f"Invalid entry: {file}")
     return None
 
-NOTEBOOK_TEMPLATE = [
-    "/etc/config/notebook_template.yaml",
-    NOTEBOOK_TEMPLATE_YAML,
-]
-
-NOTEBOOK_TEMPLATE_CLONE_YAML = os.path.join(
-    FILE_ABS_PATH, "yaml/notebook_template_clone.yaml"
-)
-
-NOTEBOOK_TEMPLATE_CLONES = [
-    "/etc/config/notebook_template_clone.yaml",
-    NOTEBOOK_TEMPLATE_CLONE_YAML,
-]
-
 AUTHORIZATIONPOLICY_TEMPLATE_YAML = os.path.join(
     FILE_ABS_PATH, "yaml/authorizationpolicy_template.yaml"
 )
-
-AUTHORIZATIONPOLICY_TEMPLATE = [
-    "/etc/config/authorizationpolicy_template.yaml",
-    NOTEBOOK_TEMPLATE_CLONE_YAML,
-]
-
-
 # Lance end 20240907
 
 LAST_ACTIVITY_ANNOTATION = "notebooks.kubeflow.org/last-activity"
@@ -94,8 +82,7 @@ def load_spawner_ui_config():
 
 # Lance begin 20240907
 def load_authorizationpolicy_template(**kwargs):
-    authorizationpolicy = get_first_existing_file(AUTHORIZATIONPOLICY_TEMPLATE_YAML)
-    return helpers.load_param_yaml(authorizationpolicy, **kwargs)
+    return helpers.load_param_yaml(AUTHORIZATIONPOLICY_TEMPLATE_YAML, **kwargs)
 # Lance end 20240907
 
 def process_gpus(container):
@@ -164,6 +151,20 @@ def get_storage_class(vol):
 def get_notebook_last_activity(notebook):
     annotations = notebook["metadata"].get("annotations", {})
     return annotations.get(LAST_ACTIVITY_ANNOTATION, "")
+
+
+def format_cpu_quantity(value):
+    if value in (None, ""):
+        return value
+
+    normalized = str(value).strip()
+    if normalized.endswith("m"):
+        try:
+            return str(float(normalized[:-1]) / 1000).rstrip("0").rstrip(".")
+        except ValueError:
+            return value
+
+    return normalized
 
 
 def notebook_dict_from_k8s_obj(notebook):
@@ -246,7 +247,7 @@ def notebook_dict_from_k8s_obj(notebook):
         "last_activity": get_notebook_last_activity(notebook),
         "image": imageName,
         "shortImage": shortImage,
-        "cpu": cntr["resources"]["requests"]["cpu"],
+        "cpu": format_cpu_quantity(cntr["resources"]["requests"]["cpu"]),
         "gpus": process_gpus(cntr),
         "memory": cntr["resources"]["requests"]["memory"],
         "volumes": volumeMounts,

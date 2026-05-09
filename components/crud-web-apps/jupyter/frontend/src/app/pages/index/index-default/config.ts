@@ -14,6 +14,7 @@ import {
   MenuValue,
 } from 'kubeflow';
 import { ServerTypeComponent } from './server-type/server-type.component';
+import { SshToggleComponent } from './ssh-toggle/ssh-toggle.component';
 
 // --- Config for the Resource Table ---
 export const defaultConfig: TableConfig = {
@@ -60,7 +61,7 @@ export const defaultConfig: TableConfig = {
       matColumnDef: 'age',
       style: { width: '12%' },
       textAlignment: 'right',
-      value: new DateTimeValue({ field: 'age' }),
+      value: new DateTimeValue({ field: 'Created at' }),
       sort: true,
     },
     {
@@ -114,6 +115,14 @@ export const defaultConfig: TableConfig = {
     },
 
     {
+      matHeaderCellDef: $localize`ssh`,
+      matColumnDef: 'ssh',
+      style: { width: '72px' },
+      value: new ComponentValue({
+        component: SshToggleComponent,
+      }),
+    },
+    {
       matHeaderCellDef: '',
       matColumnDef: 'actions',
       value: new ActionListValue([
@@ -133,7 +142,7 @@ export const defaultConfig: TableConfig = {
           field: 'shareAction',
           iconReady: 'material:screen_share',
         }),
-        // 2023/08/29 YCL sharing end //        
+        // 2023/08/29 YCL sharing end //
         new ActionIconValue({
           name: 'start-stop',
           tooltipInit: $localize`Stop this notebook server`,
@@ -182,7 +191,7 @@ export const defaultAdvancedConfig: TableConfig = {
       }),
     },
     {
-      matHeaderCellDef: $localize`Age`,
+      matHeaderCellDef: $localize`Created at`,
       matColumnDef: 'age',
       style: { width: '12%' },
       textAlignment: 'right',
@@ -233,6 +242,14 @@ export const defaultAdvancedConfig: TableConfig = {
       matHeaderCellDef: $localize`Volumes`,
       matColumnDef: 'volumes',
       value: new MenuValue({ field: 'volumes', itemsIcon: 'storage' }),
+    },
+    {
+      matHeaderCellDef: $localize`ssh`,
+      matColumnDef: 'ssh',
+      style: { width: '72px' },
+      value: new ComponentValue({
+        component: SshToggleComponent,
+      }),
     },
     {
       matHeaderCellDef: '',

@@ -14,6 +14,7 @@ export type ServerType = 'jupyter' | 'group-one' | 'group-two';
 export interface NotebookResponseObject {
   name: string;
   namespace: string;
+  metadata?: V1ObjectMeta;
   serverType: ServerType;
   status: Status;
   reason: string;
@@ -34,22 +35,24 @@ export interface NotebookResponseObject {
   shortImageVersion: string;
   customerImageName: string;
   customerImageVersion: string;
-  customerCourseName: string;  
+  customerCourseName: string;
 }
 
 export interface NotebookProcessedObject extends NotebookResponseObject {
   setTemplateAction?: string;
-  removeTemplateAction?: string;  
+  removeTemplateAction?: string;
   deleteAction?: string;
   connectAction?: string;
+  sshAction?: string;
+  sshUpdating?: boolean;
   startStopAction?: string;
   link: {
     text: string;
     url: string;
     queryParams?: Params | null;
   };
-  viewAction?:string;
-  shareAction?:string;  
+  viewAction?: string;
+  shareAction?: string;
 }
 
 export interface NotebookFormObject {
@@ -77,7 +80,7 @@ export interface NotebookFormObject {
   isTemplate: string;
   customerImageName: string;
   customerImageVersion: string;
-  customerCourseName: string;  
+  customerCourseName: string;
 }
 
 export interface NotebookRawObject {

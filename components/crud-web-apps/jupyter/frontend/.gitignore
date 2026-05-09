@@ -48,6 +48,9 @@ Thumbs.db
 # Fonts Files
 /src/assets/fonts
 
+# Package lock files
+package-lock.json
+
 # Cypress
 cypress/screenshots
 

@@ -1,0 +1,11 @@
+.ssh-toggle-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 64px;
+}
+
+:host ::ng-deep .ssh-toggle-cell .mat-slide-toggle {
+  transform: scale(0.88);
+  transform-origin: center;
+}
