@@ -373,7 +373,9 @@
   {{ dockerImage }}
 </lib-details-list-item>
 
-<lib-details-list-item key="Proxy Port">
+<lib-details-list-item key="Proxy Allow Ports"> {{proxyAllowPorts}} </lib-details-list-item>
+
+<lib-details-list-item key="Proxy Ports">
   <ng-container *ngIf="editingField !== 'proxyPort'; else proxyPortEdit">
     <div class="resource-value-row">
       {{ proxyPortList }}

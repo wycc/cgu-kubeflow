@@ -47,6 +47,10 @@ export class OverviewComponent implements OnInit, OnDestroy {
     return this.notebook?.metadata?.annotations?.['kflow.cgu.com.tw/proxy-ports'] || '';
   }
 
+  get proxyAllowPorts(): string{
+    return this.notebook?.metadata?.annotations?.['kflow.cgu.com.tw/proxy-allow-ports'] || '';
+  }
+
   get isEditingResources(): boolean {
     return this.editingField !== null;
   }

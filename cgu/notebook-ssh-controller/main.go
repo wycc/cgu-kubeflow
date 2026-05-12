@@ -44,7 +44,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&adminUsers, "admin-users", "kubernetes-admin", "Comma-separated list of usernames allowed to modify the target annotation.")
+	flag.StringVar(&adminUsers, "admin-users", "kubernetes-admin, system:serviceaccount:ldap:backend-service-account", "Comma-separated list of usernames allowed to modify the target annotation.")
 	opts := zap.Options{
 		Development: true,
 	}

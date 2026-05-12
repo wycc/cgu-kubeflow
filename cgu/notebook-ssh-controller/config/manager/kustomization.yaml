@@ -5,4 +5,4 @@ resources:
 
 images:
 - name: controller
-  newName: cguaicadmin/notebook-ssh-controller:pattentest
+  newName: cguaicadmin/notebook-ssh-controller:V1.1.1

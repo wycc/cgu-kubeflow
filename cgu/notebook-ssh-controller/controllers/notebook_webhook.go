@@ -98,9 +98,9 @@ func (v *NotebookValidator) Handle(ctx context.Context, req admission.Request) a
 		logger.Info("Target annotation has changed", "annotations", changedKeys)
 		// If changed, check if the user is an admin
 		if slices.Contains(changedKeys, "kflow.cgu.com.tw/proxy-ports") {
-			var newPorts, _ = notebook.Annotations["kflow.cgu.com.tw/proxy-ports"]
+			var newPorts = strings.ReplaceAll(notebook.Annotations["kflow.cgu.com.tw/proxy-ports"], " ", "")
 			for _, port := range strings.Split(newPorts, ",") {
-				var allowPorts, _ = notebook.Annotations["kflow.cgu.com.tw/proxy-allow-ports"]
+				var allowPorts = strings.ReplaceAll(notebook.Annotations["kflow.cgu.com.tw/proxy-allow-ports"], " ", "")
 				if !slices.Contains(strings.Split(allowPorts, ","), port) {
 					return admission.Denied("Annotations should belongs to proxy-allow-ports.")
 				}
