@@ -166,6 +166,8 @@ class CloneNotebook:
 
     # Load the template
     samplepv_yaml = utils.get_first_existing_file(SAMPLEPV)
+    print(f"Load PV template from {samplepv_yaml}")
+    print(f"SAMPLE_PV: {SAMPLE_PV}")
     template = self.load_template(samplepv_yaml)
 
     # Replace fields in the template with values from the PV
@@ -224,6 +226,7 @@ class CloneNotebook:
 
       # Clone the PV
       newpvname = pv.metadata.name + '-' + target_namespace+'-'+newpvcname
+      print(f"Clone PV {pv.metadata.name} to {newpvname}")
       self.clone_pv(pv.metadata.name, newpvname)
 
     # Load the template
