@@ -21,4 +21,10 @@ export class CDBBackendService {
 
     return this.http.get<DashboardLinks>(url);
   }
+
+  public getAnnouncements(): Observable<any> {
+    const url = 'api/announcements';
+
+    return this.http.get<any>(url);
+  }
 }

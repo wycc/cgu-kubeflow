@@ -22,8 +22,8 @@ commonLabels:
   kustomize.component: jupyter-web-app
 images:
 - name: docker.io/kubeflownotebookswg/jupyter-web-app
-  newName: docker.io/kubeflownotebookswg/jupyter-web-app
-  newTag: v1.8.0
+  newName: cguaicadmin/jupyter
+  newTag: v260516-ann-v8
 # We need the name to be unique without the suffix because the original name is what
 # gets used with patches
 configMapGenerator:

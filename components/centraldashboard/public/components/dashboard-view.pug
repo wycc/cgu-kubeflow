@@ -1,14 +1,8 @@
+iron-ajax(auto, url='/api/announcements', handle-as='json',
+    on-response='_onAnnouncementsResponse', on-error='_onAnnouncementsError')
+
 div#grid
     .column
-        paper-card#Quick-Links(heading='Quick shortcuts')
-            template(is='dom-repeat', items='[[quickLinks]]')
-                iframe-link.link(href$="[[item.link]]")
-                    paper-icon-item
-                        iron-icon(icon='kubeflow:bolt', slot='item-icon')
-                        paper-item-body(two-line)
-                            .header [[item.text]]
-                            aside(secondary) [[item.desc]]
-                        paper-ripple
         template(is='dom-if', if='[[metrics.resourceChartsLinkText]]')
             resource-chart(header-text='Cluster CPU Utilization', metric='cpu',
                 interval='Last60m',
@@ -18,10 +12,28 @@ div#grid
                 interval='Last60m',
                 external-link='[[metrics.resourceChartsLink]]'
                 external-link-text='[[metrics.resourceChartsLinkText]]')
+        template(is='dom-if', if='[[announcements.length]]')
+            paper-card#Announcements(heading='System Announcements')
+                template(is='dom-repeat', items='[[announcements]]')
+                    paper-icon-item(class$='announcement-item [[_announcementTypeClass(item.type)]]')
+                        paper-item-body(two-line)
+                            .header [[item.title]]
+                            aside(secondary) [[item.date]]
+                            .announcement-content [[item.content]]
+                        paper-ripple
     .column
         notebooks-card(namespace='[[namespace]]')
         pipelines-card(heading='Recent Pipelines', artifact-type='pipelines', namespace='[[namespace]]')
         pipelines-card(heading='Recent Pipeline Runs', artifact-type='runs', namespace='[[namespace]]')
+        paper-card#Quick-Links(heading='Quick shortcuts')
+            template(is='dom-repeat', items='[[quickLinks]]')
+                iframe-link.link(href$="[[item.link]]")
+                    paper-icon-item
+                        iron-icon(icon='kubeflow:bolt', slot='item-icon')
+                        paper-item-body(two-line)
+                            .header [[item.text]]
+                            aside(secondary) [[item.desc]]
+                        paper-ripple
     .column
         template(is='dom-if', if='[[platformDetails.links]]')
             paper-card#Platform-Links(class$='[[platformDetails.name]]',

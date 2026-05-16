@@ -54,3 +54,42 @@
     font-weight: 400;
     padding: .5em 1em;
 }
+
+#Announcements .announcement-item {
+    border-left: 4px solid #1a73e8;
+    margin: 0.5em 0.75em;
+    border-radius: 4px;
+    background: #fff;
+}
+
+#Announcements .announcement-item .header {
+    font-weight: 600;
+}
+
+#Announcements .announcement-content {
+    font-size: 12px;
+    color: #3c4043;
+    line-height: 1.4;
+    margin-top: 4px;
+    white-space: pre-line;
+    word-break: break-word;
+    overflow: visible;
+    display: block;
+    max-height: none;
+}
+
+#Announcements .announcement-info {
+    border-left-color: #1a73e8;
+}
+
+#Announcements .announcement-warning {
+    border-left-color: #f29900;
+}
+
+#Announcements .announcement-error {
+    border-left-color: #d93025;
+}
+
+#Announcements .announcement-success {
+    border-left-color: #188038;
+}

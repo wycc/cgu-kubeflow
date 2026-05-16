@@ -17,6 +17,18 @@ export interface PlatformInfo {
   buildId: string;
 }
 
+export interface Announcement {
+  id: number;
+  date: string;
+  title: string;
+  content: string;
+  type: string;
+}
+
+export interface AnnouncementsResponse {
+  announcements: Announcement[];
+}
+
 /** Wrap Kubernetes API calls in a simpler interface for use in routes. */
 export class KubernetesService {
   private namespace = 'kubeflow';
@@ -116,5 +128,23 @@ export class KubernetesService {
       console.error('Unable to fetch Node information:', err.body || err);
     }
     return provider;
+  }
+
+  /** Retrieves announcements from the kubeflow-announcements ConfigMap. */
+  async getAnnouncements(): Promise<AnnouncementsResponse> {
+    try {
+      const { body } = await this.coreAPI.readNamespacedConfigMap('kubeflow-announcements', this.namespace);
+      if (body.data && body.data['announcements.json']) {
+        const parsed = JSON.parse(body.data['announcements.json']);
+        if (Array.isArray(parsed)) {
+          return { announcements: parsed as Announcement[] };
+        }
+        return (parsed || { announcements: [] }) as AnnouncementsResponse;
+      }
+      return { announcements: [] };
+    } catch (err) {
+      console.error('Unable to fetch Announcements:', err.body || err);
+      return { announcements: [] };
+    }
   }
 }

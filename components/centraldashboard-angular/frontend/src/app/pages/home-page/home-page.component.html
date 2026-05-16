@@ -1,1 +1,65 @@
-<p>home-page works!</p>
+<div class="home-page-container">
+  <div class="dashboard-grid">
+    <!-- Left Column -->
+    <div class="left-column">
+      <!-- Quick Shortcuts Card -->
+      <div class="dashboard-card">
+        <h2 class="card-title">Quick shortcuts</h2>
+        <div class="shortcuts-container" *ngIf="quickLinks.length > 0; else noShortcuts">
+          <a *ngFor="let link of quickLinks" [href]="link.link" class="shortcut-item">
+            <div class="shortcut-text">{{ link.text }}</div>
+            <div class="shortcut-desc">{{ link.desc }}</div>
+          </a>
+        </div>
+        <ng-template #noShortcuts>
+          <p class="no-content">No shortcuts available</p>
+        </ng-template>
+      </div>
+
+      <!-- System Announcements Card (Below Shortcuts) -->
+      <div class="dashboard-card" *ngIf="announcements.length > 0">
+        <h2 class="card-title">System Announcements</h2>
+        <div class="announcements-container">
+          <article
+            *ngFor="let item of announcements"
+            class="announcement-item"
+            [ngClass]="announcementTypeClass(item.type)"
+          >
+            <div class="announcement-meta">{{ item.date }} | {{ item.type | uppercase }}</div>
+            <div class="announcement-title">{{ item.title }}</div>
+            <div class="announcement-content">{{ item.content }}</div>
+          </article>
+        </div>
+      </div>
+
+      <!-- Recent Notebooks Card -->
+      <div class="dashboard-card">
+        <h2 class="card-title">Recent Notebooks</h2>
+        <p class="no-content">No recent notebooks</p>
+      </div>
+
+      <!-- Recent Pipeline Runs Card -->
+      <div class="dashboard-card">
+        <h2 class="card-title">Recent Pipeline Runs</h2>
+        <p class="no-content">No recent pipeline runs</p>
+      </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="right-column">
+      <!-- Documentation Card -->
+      <div class="dashboard-card">
+        <h2 class="card-title">Documentation</h2>
+        <div class="documentation-container" *ngIf="documentationItems.length > 0; else noDocumentation">
+          <a *ngFor="let item of documentationItems" [href]="item.link" target="_blank" class="doc-item">
+            <div class="doc-text">{{ item.text }}</div>
+            <div class="doc-desc">{{ item.desc }}</div>
+          </a>
+        </div>
+        <ng-template #noDocumentation>
+          <p class="no-content">No documentation available</p>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+</div>

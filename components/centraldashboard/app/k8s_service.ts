@@ -14,6 +14,18 @@ export interface PlatformInfo {
   logoutUrl: string;
 }
 
+export interface Announcement {
+  id: number;
+  date: string;
+  title: string;
+  content: string;
+  type: string;
+}
+
+export interface AnnouncementsResponse {
+  announcements: Announcement[];
+}
+
 /**
  * Relevant fields from the description property of the Application CRD
  * https://github.com/kubernetes-sigs/application/blob/master/config/crds/app_v1beta1_application.yaml
@@ -99,6 +111,25 @@ export class KubernetesService {
       console.error(
           `Unable to fetch Events for ${namespace}:`, err.body || err);
       return [];
+    }
+  }
+
+  /** Retrieves announcements from the kubeflow-announcements ConfigMap. */
+  async getAnnouncements(): Promise<AnnouncementsResponse> {
+    try {
+      const {body} = await this.coreAPI.readNamespacedConfigMap(
+          'kubeflow-announcements', this.namespace);
+      if (body.data && body.data['announcements.json']) {
+        const parsed = JSON.parse(body.data['announcements.json']);
+        if (Array.isArray(parsed)) {
+          return {announcements: parsed as Announcement[]};
+        }
+        return (parsed || {announcements: []}) as AnnouncementsResponse;
+      }
+      return {announcements: []};
+    } catch (err) {
+      console.error('Unable to fetch Announcements:', err.body || err);
+      return {announcements: []};
     }
   }
 

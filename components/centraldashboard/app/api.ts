@@ -108,6 +108,16 @@ export class Api {
               });
             }
             res.json(settings);
+          })
+        .get(
+          '/announcements',
+          async (_: Request, res: Response) => {
+            try {
+              const announcements = await this.k8sService.getAnnouncements();
+              res.json(announcements);
+            } catch (e) {
+              res.json({announcements: []});
+            }
           });
   }
 }

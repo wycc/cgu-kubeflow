@@ -35,6 +35,10 @@ export class DashboardView extends utilitiesMixin(PolymerElement) {
         return {
             documentationItems: Array,
             quickLinks: Array,
+            announcements: {
+                type: Array,
+                value: [],
+            },
             namespace: {
                 type: Object,
                 observer: '_namespaceChanged',
@@ -75,6 +79,25 @@ export class DashboardView extends utilitiesMixin(PolymerElement) {
         // We need to deep-copy and re-assign in order to trigger the
         // re-rendering of the component
         this.quickLinks = JSON.parse(JSON.stringify(this.quickLinks));
+    }
+
+    _onAnnouncementsResponse(ev) {
+        const response = ev.detail.response || {};
+        this.announcements = response.announcements || [];
+    }
+
+    _onAnnouncementsError() {
+        this.announcements = [];
+    }
+
+    _announcementTypeClass(type) {
+        const typeMap = {
+            info: 'announcement-info',
+            warning: 'announcement-warning',
+            error: 'announcement-error',
+            success: 'announcement-success',
+        };
+        return typeMap[type] || 'announcement-info';
     }
 }
 
