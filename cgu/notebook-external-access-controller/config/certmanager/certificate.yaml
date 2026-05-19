@@ -1,0 +1,15 @@
+# The following manifests contain a self-signed issuer CR and a certificate CR.
+# More document can be found at https://docs.cert-manager.io
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: notebook-serving-cert
+  namespace: cgu
+spec:
+  dnsNames:
+  - notebook-external-access-notebook-webhook-service.cgu.svc
+  - notebook-external-access-notebook-webhook-service.cgu.svc.cluster.local
+  issuerRef:
+    kind: ClusterIssuer
+    name: kubeflow-self-signing-issuer
+  secretName: webhook-server-cert
