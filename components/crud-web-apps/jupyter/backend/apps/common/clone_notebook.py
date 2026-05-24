@@ -2,8 +2,6 @@ from kubernetes import client, config
 import yaml
 import time,os
 import traceback
-from . import utils
-
 from kubernetes.config.config_exception import ConfigException
 # Load the Kubernetes configuration
 # Create API endpoints for the core API and custom object API
@@ -31,31 +29,19 @@ the user can customize the behaviour of the clone container.
 """
 FILE_ABS_PATH = os.path.abspath(os.path.dirname(__file__))
 
-# NOTEBOOK_TEMPLATE_YAML = os.path.join(
-#     FILE_ABS_PATH, "yaml/notebook_template.yaml"
-# )
+NOTEBOOK_TEMPLATE_YAML = os.path.join(
+    FILE_ABS_PATH, "yaml/notebook_template.yaml"
+)
 
 SAMPLE_NOTEBOOK = os.path.join(
     FILE_ABS_PATH, "yaml/sample_notebook.yaml"
 )
-
 SAMPLE_PVC = os.path.join(
     FILE_ABS_PATH, "yaml/sample_pvc.yaml"
 )
-
-SAMPLEPVC = [
-    "/etc/config/sample_pvc.yaml",
-    SAMPLE_PVC,
-]
-
 SAMPLE_PV = os.path.join(
     FILE_ABS_PATH, "yaml/sample_pv.yaml"
 )
-
-SAMPLEPV = [
-    "/etc/config/sample_pv.yaml",
-    SAMPLE_PV,
-]
 
 class CloneNotebook:
   def __init__(self):
@@ -165,10 +151,7 @@ class CloneNotebook:
     pv = self.fetch_pv(oldpvname)
 
     # Load the template
-    samplepv_yaml = utils.get_first_existing_file(SAMPLEPV)
-    print(f"Load PV template from {samplepv_yaml}")
-    print(f"SAMPLE_PV: {SAMPLE_PV}")
-    template = self.load_template(samplepv_yaml)
+    template = self.load_template(SAMPLE_PV)
 
     # Replace fields in the template with values from the PV
     updated_template = self.replace_fields(template, pv,pv.attribute_map)
@@ -226,12 +209,11 @@ class CloneNotebook:
 
       # Clone the PV
       newpvname = pv.metadata.name + '-' + target_namespace+'-'+newpvcname
-      print(f"Clone PV {pv.metadata.name} to {newpvname}")
       self.clone_pv(pv.metadata.name, newpvname)
+    
 
     # Load the template
-    samplepvc_yaml = utils.get_first_existing_file(SAMPLEPVC)
-    template = self.load_template(samplepvc_yaml)
+    template = self.load_template(SAMPLE_PVC)
 
     # Replace fields in the template with values from the PV
     updated_template = self.replace_fields(template, pvc,pvc.attribute_map)

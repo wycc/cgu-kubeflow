@@ -127,10 +127,9 @@ def set_notebook_cpu(notebook, body, defaults):
     limit_factor = utils.load_spawner_ui_config()["cpu"].get("limitFactor")
     if not cpu_limit and limit_factor != "none":
         cpu_limit = str(round((float(cpu) * float(limit_factor)), 1))
-    # virtual_factor = utils.load_spawner_ui_config()["cpu"].get("virtualFactor")
-    # container["resources"]["requests"]["cpu"] = cpu / virtual_factor
+
     container["resources"]["requests"]["cpu"] = cpu
-    
+
     if cpu_limit is None or cpu_limit == "":
         # user explicitly asked for no limits
         return

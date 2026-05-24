@@ -1,0 +1,27 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: notebook-validating-webhook-configuration
+  annotations:
+    cert-manager.io/inject-ca-from: cgu/notebook-external-access-notebook-serving-cert
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: notebook-external-access-notebook-webhook-service
+      namespace: cgu
+      path: /validate-kubeflow-org-v1beta1-notebook
+  failurePolicy: Fail
+  name: vnotebook.kb.io
+  rules:
+  - apiGroups:
+    - kubeflow.org
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - notebooks
+  sideEffects: None
