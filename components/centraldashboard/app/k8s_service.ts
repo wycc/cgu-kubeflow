@@ -24,6 +24,7 @@ export interface Announcement {
 
 export interface AnnouncementsResponse {
   announcements: Announcement[];
+  maxAnnouncements?: number;
 }
 
 /**
@@ -124,7 +125,10 @@ export class KubernetesService {
         if (Array.isArray(parsed)) {
           return {announcements: parsed as Announcement[]};
         }
-        return (parsed || {announcements: []}) as AnnouncementsResponse;
+        return {
+          announcements: parsed.announcements || [],
+          maxAnnouncements: parsed.maxAnnouncements,
+        };
       }
       return {announcements: []};
     } catch (err) {

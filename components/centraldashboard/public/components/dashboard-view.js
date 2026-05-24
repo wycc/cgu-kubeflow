@@ -83,7 +83,12 @@ export class DashboardView extends utilitiesMixin(PolymerElement) {
 
     _onAnnouncementsResponse(ev) {
         const response = ev.detail.response || {};
-        this.announcements = response.announcements || [];
+        let anns = response.announcements || [];
+        const max = response.maxAnnouncements;
+        if (max && anns.length > max) {
+            anns = anns.slice(0, max);
+        }
+        this.announcements = anns;
     }
 
     _onAnnouncementsError() {
