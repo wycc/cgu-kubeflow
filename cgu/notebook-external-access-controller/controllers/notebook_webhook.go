@@ -98,11 +98,6 @@ func (v *NotebookValidator) Handle(ctx context.Context, req admission.Request) a
 		logger.Info("Target annotation has changed", "annotations", changedKeys)
 
 		// If changed, check if the user is an admin
-		if !v.isAdmin(req.UserInfo.Username) {
-			logger.Info("Access denied: user is not in admin list", "adminUsersConfigured", v.AdminUsers)
-			return admission.Denied("Permission Denied: Only admins can add or modify annotations: " + strings.Join(changedKeys, ", "))
-		}
-
 		if slices.Contains(changedKeys, "kflow.cgu.com.tw/proxy-ports") {
 			var newPorts = strings.ReplaceAll(notebook.Annotations["kflow.cgu.com.tw/proxy-ports"], " ", "")
 			for _, port := range strings.Split(newPorts, ",") {
@@ -111,6 +106,9 @@ func (v *NotebookValidator) Handle(ctx context.Context, req admission.Request) a
 					return admission.Denied("Annotations should belongs to proxy-allow-ports.")
 				}
 			}
+		} else if !v.isAdmin(req.UserInfo.Username) {
+			logger.Info("Access denied: user is not in admin list", "adminUsersConfigured", v.AdminUsers)
+			return admission.Denied("Permission Denied: Only admins can add or modify annotations: " + strings.Join(changedKeys, ", "))
 		}
 
 		logger.Info("Access granted")
