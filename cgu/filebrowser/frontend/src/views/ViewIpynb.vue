@@ -93,8 +93,7 @@ onMounted(async () => {
       defaultMathJaxTypesetterConfig
     );
     await notebookInstance.render();
-    notebookContainer.value.innerHTML = "";
-    notebookContainer.value.appendChild(notebookInstance.notebookHTML);
+    notebookContainer.value.innerHTML = notebookInstance.notebookHTML;
   } else {
     console.error('Content is not loaded');
   }

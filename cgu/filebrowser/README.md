@@ -37,3 +37,8 @@ For installation instructions please refer to our docs at [https://filebrowser.o
 ## Contributing
 
 If you're interested in contributing to this project, our docs are best places to start [https://filebrowser.org/contributing](https://filebrowser.org/contributing).
+
+
+## Build
+make build
+docker build -t cguaicadmin/filebrowser:V1.0.1 -f Dockerfile .

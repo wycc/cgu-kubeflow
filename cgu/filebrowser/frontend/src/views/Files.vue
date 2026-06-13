@@ -120,8 +120,7 @@ watch([currentView, () => fileStore.req], async ([view]) => {
       : fileStore.req.content;
     const notebookInstance = new Notebook(content, true, true, defaultMarkdownParser, defaultMathJaxTypesetterConfig);
     await notebookInstance.render();
-    notebookContainer.value.innerHTML = "";
-    notebookContainer.value.appendChild(notebookInstance.notebookHTML);
+    notebookContainer.value.innerHTML = notebookInstance.notebookHTML;
     console.log(notebookInstance, notebookContainer.value.innerHTML);
   }
 });

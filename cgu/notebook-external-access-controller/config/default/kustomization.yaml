@@ -12,6 +12,7 @@ namespace: cgu
 namePrefix: notebook-external-access-
 
 resources:
+- ../rbac
 - ../manager
 - ../webhook
 - ../certmanager

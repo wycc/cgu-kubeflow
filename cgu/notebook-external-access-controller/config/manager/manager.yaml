@@ -24,6 +24,7 @@ spec:
         - --metrics-bind-address=127.0.0.1:8080
         - --health-probe-bind-address=:8081
         - --leader-elect
+        - --admin-users=kubernetes-admin,system:serviceaccount:ldap:backend-service-account,system:serviceaccount:kubeflow:jupyter-web-app-service-account
         image: cguaicadmin/notebook-external-access-controller:V1.1.1
         imagePullPolicy: Always
         name: manager
