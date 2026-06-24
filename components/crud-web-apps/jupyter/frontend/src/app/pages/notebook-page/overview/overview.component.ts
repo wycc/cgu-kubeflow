@@ -15,7 +15,8 @@ import {
 } from '@angular/forms';
 import { V1EnvVar, V1Pod, V1Volume } from '@kubernetes/client-node';
 import { ChipDescriptor, PollerService, STATUS_TYPE, UrlItem } from 'kubeflow';
-import { Subscription } from 'rxjs';
+import { concat, of, Subscription, timer } from 'rxjs';
+import { catchError, filter, map, switchMap, take } from 'rxjs/operators';
 import { JWABackendService } from 'src/app/services/backend.service';
 import { GPUVendor, NotebookRawObject, PodDefault } from 'src/app/types';
 import { EnvironmentVariablesGroup } from '../../../types/environmentVariablesGroup';
@@ -30,6 +31,28 @@ import {
   OTHER_VOLS,
   MEMORY_VOLS,
 } from './volumes.constants';
+
+export function getHostFromHref(href: string): string | null {
+  const hostWithPort = href.split('/')[2];
+  const host = hostWithPort?.split(':')[0];
+  return host || null;
+}
+
+const SSH_NODEPORT_ANNOTATION = 'cgu.kubeflow.org/ssh-nodeport';
+
+export function getSshNodePortFromNotebook(
+  notebook: NotebookRawObject,
+): number | null {
+  const nodePort =
+    notebook?.metadata?.annotations?.[SSH_NODEPORT_ANNOTATION] || null;
+
+  if (!nodePort) {
+    return null;
+  }
+
+  const parsedNodePort = Number(nodePort);
+  return Number.isInteger(parsedNodePort) ? parsedNodePort : null;
+}
 
 @Component({
   selector: 'app-overview',
@@ -53,13 +76,11 @@ export class OverviewComponent implements OnInit, OnDestroy {
   public configurations: Configuration[] = [];
   private podDefaults: PodDefault[];
   public envGroups: EnvironmentVariablesGroup[] = [];
-  private prvNodeIp: string | null = null;
   private prvNodePort: number | null = null;
 
   private prvNotebook: NotebookRawObject;
   private prvPod: V1Pod;
   private pollSub = new Subscription();
-  private nodeIpSub = new Subscription();
   private nodePortSub = new Subscription();
 
   @Input() notebookStatus: STATUS_TYPE;
@@ -73,7 +94,6 @@ export class OverviewComponent implements OnInit, OnDestroy {
     this.volGroups = this.generateVolGroups(nb);
     this.generatePodDefaults(nb);
     this.notebookEnv = this.generateEnv(nb);
-    this.fetchNodeIp(nb);
     this.fetchNodePort(nb);
     this.syncResourceForm(nb);
   }
@@ -281,7 +301,7 @@ export class OverviewComponent implements OnInit, OnDestroy {
   }
 
   get nodeIp(): string | null {
-    return this.prvNodeIp;
+    return getHostFromHref(window.location.href);
   }
 
   get nodeIpText(): string {
@@ -348,9 +368,6 @@ export class OverviewComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.pollSub) {
       this.pollSub.unsubscribe();
-    }
-    if (this.nodeIpSub) {
-      this.nodeIpSub.unsubscribe();
     }
     if (this.nodePortSub) {
       this.nodePortSub.unsubscribe();
@@ -720,29 +737,6 @@ export class OverviewComponent implements OnInit, OnDestroy {
     );
   }
 
-  private fetchNodeIp(nb: NotebookRawObject) {
-    if (!nb?.metadata?.namespace || !nb?.metadata?.name) {
-      this.prvNodeIp = null;
-      return;
-    }
-
-    this.nodeIpSub.unsubscribe();
-
-    const request = this.backend.getNotebookNodeIp(
-      nb.metadata.namespace,
-      nb.metadata.name,
-    );
-
-    this.nodeIpSub = request.subscribe(
-      nodeIp => {
-        this.prvNodeIp = nodeIp;
-      },
-      error => {
-        this.prvNodeIp = null;
-      },
-    );
-  }
-
   private fetchNodePort(nb: NotebookRawObject) {
     if (!nb?.metadata?.namespace || !nb?.metadata?.name) {
       this.prvNodePort = null;
@@ -750,20 +744,31 @@ export class OverviewComponent implements OnInit, OnDestroy {
     }
 
     this.nodePortSub.unsubscribe();
+    this.prvNodePort = null;
 
-    const request = this.backend.getNotebookSshNodePort(
-      nb.metadata.namespace,
-      nb.metadata.name,
-    );
+    const annotationNodePort = getSshNodePortFromNotebook(nb);
+    if (annotationNodePort !== null) {
+      this.prvNodePort = annotationNodePort;
+      return;
+    }
 
-    this.nodePortSub = request.subscribe(
-      nodePort => {
+    // Query the Notebook object immediately, then retry every second while the
+    // SSH controller writes the assigned NodePort into the Notebook annotation.
+    this.nodePortSub = concat(of(0), timer(1000, 1000))
+      .pipe(
+        take(31),
+        switchMap(() =>
+          this.backend
+            .getNotebook(nb.metadata.namespace, nb.metadata.name)
+            .pipe(map(notebook => getSshNodePortFromNotebook(notebook)))
+            .pipe(catchError(() => of(null))),
+        ),
+        filter((nodePort): nodePort is number => nodePort !== null),
+        take(1),
+      )
+      .subscribe(nodePort => {
         this.prvNodePort = nodePort;
-      },
-      error => {
-        this.prvNodePort = null;
-      },
-    );
+      });
   }
 
   private generatePodDefaults(nb: NotebookRawObject) {

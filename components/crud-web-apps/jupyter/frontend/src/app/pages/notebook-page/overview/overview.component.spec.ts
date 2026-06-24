@@ -11,7 +11,11 @@ import {
 } from 'kubeflow';
 import { JWABackendService } from 'src/app/services/backend.service';
 import { ConfigurationsModule } from './configurations/configurations.module';
-import { OverviewComponent } from './overview.component';
+import {
+  getHostFromHref,
+  getSshNodePortFromNotebook,
+  OverviewComponent,
+} from './overview.component';
 import { of } from 'rxjs';
 import { mockNotebook } from '../notebook-mock';
 import { mockPod } from '../pod-mock';
@@ -19,8 +23,17 @@ import { VolumesComponent } from './volumes/volumes.component';
 
 const JWABackendServiceStub: Partial<JWABackendService> = {
   getPodDefaults: () => of([]),
-  getNotebookNodeIp: () => of('10.10.10.10'),
-  getNotebookSshNodePort: () => of(31234),
+  getNotebook: () =>
+    of({
+      ...mockNotebook,
+      metadata: {
+        ...mockNotebook.metadata,
+        annotations: {
+          ...mockNotebook.metadata.annotations,
+          'cgu.kubeflow.org/ssh-nodeport': '31234',
+        },
+      },
+    }),
   getConfig: () => of({}),
 };
 const PollerServiceStub: Partial<PollerService> = {
@@ -81,12 +94,45 @@ describe('OverviewComponent', () => {
     expect(component.nodePort).toBe(31234);
   });
 
-  it('should load node ip for the notebook', () => {
-    expect(component.nodeIp).toBe('10.10.10.10');
+  it('should load node port from notebook annotation first', () => {
+    const notebook = {
+      ...mockNotebook,
+      metadata: {
+        ...mockNotebook.metadata,
+        annotations: {
+          ...mockNotebook.metadata.annotations,
+          'cgu.kubeflow.org/ssh-nodeport': '31394',
+        },
+      },
+    };
+
+    component.notebook = notebook;
+
+    expect(component.nodePort).toBe(31394);
+    expect(getSshNodePortFromNotebook(notebook)).toBe(31394);
   });
 
-  it('should build the ssh command from node ip and node port', () => {
-    expect(component.sshCommand).toBe('ssh -p 31234 jovyan@10.10.10.10');
+  it('should get the host without port from window.location.href', () => {
+    const host = getHostFromHref(window.location.href);
+    expect(component.nodeIp).toBe(host);
+  });
+
+  it('should build the ssh command from URL host and node port', () => {
+    const host = getHostFromHref(window.location.href);
+    expect(component.sshCommand).toBe(`ssh -p 31234 jovyan@${host}`);
+  });
+
+  it('should parse domain and IPv4 URLs without ports', () => {
+    expect(getHostFromHref('https://kflow2.cgu.edu.tw/jupyter/')).toBe(
+      'kflow2.cgu.edu.tw',
+    );
+    expect(getHostFromHref('http://120.126.23.25:12345/jupyter/')).toBe(
+      '120.126.23.25',
+    );
+  });
+
+  it('should return null for an invalid URL', () => {
+    expect(getHostFromHref('not a URL')).toBeNull();
   });
 
   it('should treat zero values as present display values', () => {
