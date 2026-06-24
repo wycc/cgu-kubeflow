@@ -29,6 +29,7 @@ kubectl exec -n kubeflow ${POD} -- sh -c "cd /;cp -a patch.py /src/apps/common/r
 #kubectl exec -n kubeflow ${POD} -- sh -c "cd /;cp -a notebook.py /package/kubeflow/kubeflow/crud_backend/api/notebook.py"
 #kubectl exec -n kubeflow ${POD} -- sh -c "cd /;cp -a notebook.py /package/build/lib/kubeflow/kubeflow/crud_backend/api/notebook.py"
 #kubectl exec -n kubeflow ${POD} -- sh -c "cd /;cp -a notebook.py /usr/local/lib/python3.7/site-packages/kubeflow/kubeflow/crud_backend/api/notebook.py"
+kubectl exec -n kubeflow ${POD} -- sh -c "pkill -HUP gunicorn || true"
 rm -rf dist
 mv dist2 dist
 exit 0

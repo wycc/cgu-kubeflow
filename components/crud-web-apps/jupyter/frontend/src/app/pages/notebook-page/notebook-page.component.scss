@@ -5,3 +5,29 @@
 .small-padding-up {
   margin-top: 5px;
 }
+
+:host ::ng-deep lib-title-actions-toolbar .margin-content {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  margin: auto 16px auto 0;
+}
+
+.ssh-toggle-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 0;
+}
+
+.ssh-toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.72);
+}
+
+:host ::ng-deep .ssh-toggle-toolbar .mat-slide-toggle {
+  transform: scale(1.08);
+  transform-origin: left center;
+}

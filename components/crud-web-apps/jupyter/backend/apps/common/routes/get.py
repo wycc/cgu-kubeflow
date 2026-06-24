@@ -18,6 +18,40 @@ SECURE_COOKIES = os.getenv("APP_SECURE_COOKIES", "true").lower() == "true"
 DISABLE_AUTH = os.getenv("APP_DISABLE_AUTH", "false").lower() == "true"
 USER_HEADER = os.getenv("USERID_HEADER", "kubeflow-userid")
 USER_PREFIX = os.getenv("USERID_PREFIX", ":")
+SSH_NODEPORT_ANNOTATION = "cgu.kubeflow.org/ssh-nodeport"
+
+
+def _get_first_node_internal_ip():
+    nodes = api.list_nodes().items
+    for node in nodes:
+        addresses = getattr(getattr(node, "status", None), "addresses", None) or []
+        for address in addresses:
+            if (
+                getattr(address, "type", None) == "InternalIP"
+                and getattr(address, "address", None)
+            ):
+                return address.address
+
+    raise NotFound("No node InternalIP found")
+
+
+def _get_ssh_nodeport_from_service(service):
+    if not service or not service.spec or not service.spec.ports:
+        return None
+
+    for port in service.spec.ports:
+        target_port = getattr(port, "target_port", None)
+        port_name = (port.name or "").lower()
+        if (
+            "ssh" in port_name
+            or port.port == 22
+            or target_port == 22
+            or str(target_port) == "22"
+        ):
+            if port.node_port:
+                return port.node_port
+
+    return None
 
 @bp.route("/api/manager/<namespace>")
 def get_manager(namespace):
@@ -163,48 +197,77 @@ def get_notebook_pod(notebook_name, namespace):
 def get_notebook_ssh_nodeport(notebook_name, namespace):
     """Get the SSH NodePort for a notebook's service."""
     try:
+        notebook = api.get_notebook(notebook_name, namespace)
+        annotations = notebook.get("metadata", {}).get("annotations", {}) or {}
+        annotation_nodeport = annotations.get(SSH_NODEPORT_ANNOTATION)
+        if annotation_nodeport:
+            try:
+                return api.success_response("ssh_nodeport", int(annotation_nodeport))
+            except (TypeError, ValueError):
+                log.warning(
+                    "Invalid SSH NodePort annotation for notebook %s/%s: %s",
+                    namespace,
+                    notebook_name,
+                    annotation_nodeport,
+                )
+
         # Try to get service with notebook name as label selector
         label_selector = "notebook-name=" + notebook_name
         services = api.list_services(namespace=namespace, label_selector=label_selector)
-        
-        if not services.items:
+
+        service = None
+        if services.items:
+            for candidate in services.items:
+                if _get_ssh_nodeport_from_service(candidate) is not None:
+                    service = candidate
+                    break
+
+        if not service:
             # If no service found with label, try direct service name
-            # Common patterns: {notebook_name}, {notebook_name}-ssh
-            service_names = [notebook_name, f"{notebook_name}-ssh"]
-            service = None
+            # Common patterns: {notebook_name}, {notebook_name}-ssh, {notebook_name}-ssh-service
+            service_names = [
+                f"{notebook_name}-ssh-service",
+                f"{notebook_name}-ssh",
+                notebook_name,
+            ]
             for svc_name in service_names:
                 try:
-                    service = api.get_service(svc_name, namespace)
-                    if service:
+                    candidate = api.get_service(svc_name, namespace)
+                    if candidate and _get_ssh_nodeport_from_service(candidate) is not None:
+                        service = candidate
                         break
-                except:
+                except Exception:
                     continue
-            
+
             if not service:
                 raise NotFound(f"No service found for notebook {notebook_name}")
-        else:
-            service = services.items[0]
-        
+
         # Find SSH port in service
-        ssh_nodeport = None
-        if service.spec and service.spec.ports:
-            for port in service.spec.ports:
-                # Check for SSH port (common names: ssh, SSH, or port 22)
-                if (port.name and port.name.lower() == "ssh") or port.port == 22:
-                    if port.node_port:
-                        ssh_nodeport = port.node_port
-                        break
-        
+        ssh_nodeport = _get_ssh_nodeport_from_service(service)
+
         if ssh_nodeport is None:
             raise NotFound(f"No SSH NodePort found in service for notebook {notebook_name}")
-        
+
         return api.success_response("ssh_nodeport", ssh_nodeport)
-    
+
     except NotFound as e:
         raise e
     except Exception as e:
         log.error(f"Error getting SSH NodePort: {str(e)}")
         raise NotFound(f"Error retrieving SSH NodePort: {str(e)}")
+
+
+@bp.route("/api/namespaces/<namespace>/notebooks/<notebook_name>/node-ip")
+def get_notebook_node_ip(notebook_name, namespace):
+    """Get the InternalIP of any cluster node for NodePort access."""
+    try:
+        api.get_notebook(notebook_name, namespace)
+        return api.success_response("node_ip", _get_first_node_internal_ip())
+    except NotFound as e:
+        raise e
+    except Exception as e:
+        log.error(f"Error getting Node IP: {str(e)}")
+        raise NotFound(f"Error retrieving Node IP: {str(e)}")
 
 
 @bp.route("/api/namespaces/<namespace>/notebooks/<notebook_name>/pod/<pod_name>/logs")  # noqa: E501

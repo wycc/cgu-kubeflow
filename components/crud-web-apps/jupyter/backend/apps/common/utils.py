@@ -153,6 +153,20 @@ def get_notebook_last_activity(notebook):
     return annotations.get(LAST_ACTIVITY_ANNOTATION, "")
 
 
+def format_cpu_quantity(value):
+    if value in (None, ""):
+        return value
+
+    normalized = str(value).strip()
+    if normalized.endswith("m"):
+        try:
+            return str(float(normalized[:-1]) / 1000).rstrip("0").rstrip(".")
+        except ValueError:
+            return value
+
+    return normalized
+
+
 def notebook_dict_from_k8s_obj(notebook):
     cntr = notebook["spec"]["template"]["spec"]["containers"][0]
     server_type = None
@@ -233,7 +247,7 @@ def notebook_dict_from_k8s_obj(notebook):
         "last_activity": get_notebook_last_activity(notebook),
         "image": imageName,
         "shortImage": shortImage,
-        "cpu": cntr["resources"]["requests"]["cpu"],
+        "cpu": format_cpu_quantity(cntr["resources"]["requests"]["cpu"]),
         "gpus": process_gpus(cntr),
         "memory": cntr["resources"]["requests"]["memory"],
         "volumes": volumeMounts,
